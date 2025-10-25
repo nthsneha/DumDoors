@@ -1,6 +1,10 @@
-## DumDoors - AI Decision Game
+# DumDoors - Multiplayer AI Decision Game
 
 A multiplayer AI decision game built on Reddit's Devvit platform where players solve creative scenarios and their responses are scored by AI to determine their path through the game.
+
+## Game Concept
+
+Players encounter "doors" (decision scenarios/nodes) and describe their solutions. An AI scores their creativity, logic and entertainment value. Better scores = shorter paths to win!
 
 ## Technology Stack
 
@@ -13,6 +17,22 @@ A multiplayer AI decision game built on Reddit's Devvit platform where players s
 - [Python](https://python.org/): AI service for door generation and scoring
 - [Tailwind CSS](https://tailwindcss.com/): Styling
 - [TypeScript](https://www.typescriptlang.org/): Type safety
+
+## Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend       │    │   AI Service    │
+│   (React)       │◄──►│   (Go)          │◄──►│   (Python)      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └──────────────┬────────┴───────────────────────┘
+                        │
+                ┌───────▼───────┐
+                │   Databases   │
+                │ MongoDB + Neo4j + Redis │
+                └───────────────┘
+```
 
 ## Repository Structure
 
@@ -43,8 +63,8 @@ dumdoors/
 
 1. **Clone and setup the project:**
    ```bash
-   git clone <repository-url>
-   cd dumdoors
+   git clone https://github.com/nthsneha/DumDoors.git
+   cd DumDoors
    ```
 
 2. **Start the databases:**
@@ -90,6 +110,36 @@ dumdoors/
 - `devvit deploy`: Deploy to production
 - `devvit logs`: View application logs
 
+## Game Features
+
+- ✅ Real-time multiplayer via WebSocket
+- ✅ AI-driven decision scoring with personality
+- ✅ Dynamic path generation (2-20 doors based on performance)
+- ✅ Character cards based on decision patterns
+- ✅ Themed scenarios (Corporate, Horror, Sci-fi, etc.)
+- ✅ Leaderboards and player statistics
+- ✅ Reddit Devvit platform integration
+
+## Development Status
+
+**Active Development** - Core backend infrastructure and Devvit integration complete!
+
+Current state: 
+- ✅ Go backend with MongoDB, Neo4j, and Redis integration
+- ✅ Devvit platform integration
+- ✅ Repository structure organized
+- 🔄 Frontend migration to new structure
+- 🔄 AI service implementation
+- 🔄 WebSocket real-time features
+
 ## Cursor Integration
 
 This template comes with a pre-configured cursor environment. To get started, [download cursor](https://www.cursor.com/downloads) and enable the `devvit-mcp` when prompted.
+
+## 🤝 Contributing
+
+This project is actively being developed. Feel free to contribute!
+
+---
+
+*Built with ❤️ by sneha and sai*
