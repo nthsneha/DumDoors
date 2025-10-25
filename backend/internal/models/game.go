@@ -78,3 +78,14 @@ type ScoringMetrics struct {
 	Humor       int `bson:"humor" json:"humor"`
 	Originality int `bson:"originality" json:"originality"`
 }
+
+// PlayerPath represents a player's path through the game
+type PlayerPath struct {
+	PlayerID          string    `json:"playerId"`
+	Theme             string    `json:"theme"`
+	CurrentDifficulty int       `json:"currentDifficulty"`
+	DoorsVisited      []string  `json:"doorsVisited"`
+	CurrentPosition   int       `json:"currentPosition"`
+	TotalDoors        int       `json:"totalDoors"`
+	CreatedAt         time.Time `json:"createdAt"`
+}

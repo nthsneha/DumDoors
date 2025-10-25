@@ -42,18 +42,16 @@ func main() {
 	playerPathRepo := repositories.NewPlayerPathRepository(dbManager.Neo4j)
 
 	// Initialize services
-	gameService := services.NewGameService()
+	wsManager := services.NewWebSocketManager()
+	aiClient := services.NewAIClient(cfg.AIServiceURL, dbManager.Redis)
+	gameService := services.NewGameService(gameSessionRepo, doorRepo, playerPathRepo, wsManager, aiClient)
 	devvitService := services.NewDevvitIntegration()
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler()
-	gameHandler := handlers.NewGameHandler()
+	gameHandler := handlers.NewGameHandler(gameService)
 	devvitHandler := handlers.NewDevvitHandler(devvitService)
-
-	// Suppress unused variable warnings for repositories that will be used in later tasks
-	_ = gameSessionRepo
-	_ = doorRepo
-	_ = playerPathRepo
+	wsHandler := handlers.NewWebSocketHandler(wsManager, gameService)
 
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
@@ -98,21 +96,28 @@ func main() {
 	// Devvit integration routes (migrated from Express server)
 	api.Get("/init", devvitHandler.InitGame)
 
-	// Game routes (placeholders for future implementation)
+	// Game routes
 	game := api.Group("/game")
-	_ = game // Suppress unused variable warning for now
+	game.Post("/create", gameHandler.CreateSession)
+	game.Post("/join/:sessionId", gameHandler.JoinSession)
+	game.Get("/status/:sessionId", gameHandler.GetSessionStatus)
+	game.Post("/start/:sessionId", gameHandler.StartGame)
+	game.Post("/start-with-door/:sessionId", gameHandler.StartGameWithDoor)
+	game.Get("/next-door", gameHandler.GetNextDoor)
+	game.Post("/submit-response", gameHandler.SubmitResponse)
 
-	// WebSocket routes (placeholder for future implementation)
+	// WebSocket routes
 	ws := api.Group("/ws")
-	_ = ws // Suppress unused variable warning for now
+	ws.Get("/connect", wsHandler.UpgradeConnection)
+	ws.Get("/status/:sessionId", wsHandler.GetConnectionStatus)
+	ws.Post("/broadcast/:sessionId", wsHandler.BroadcastMessage)
 
 	// Internal Devvit routes
 	internal := app.Group("/internal")
 	internal.Post("/on-app-install", devvitHandler.OnAppInstall)
 	internal.Post("/menu/post-create", devvitHandler.MenuPostCreate)
 
-	// Suppress unused variable warnings for services that will be used in later tasks
-	_ = gameService
+
 
 	log.Printf("Starting DumDoors backend on port %s", cfg.Port)
 	log.Printf("Configuration loaded: MongoDB=%s, Neo4j=%s, Redis=%s, AI Service=%s", 

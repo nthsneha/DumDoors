@@ -3,7 +3,9 @@ package repositories
 import (
 	"context"
 	"dumdoors-backend/internal/database"
+	"dumdoors-backend/internal/models"
 	"fmt"
+	"time"
 )
 
 // PlayerPathRepository interface defines operations for player paths in Neo4j
@@ -11,7 +13,8 @@ type PlayerPathRepository interface {
 	CreatePlayer(ctx context.Context, playerID, username string) error
 	GetNextDoor(ctx context.Context, playerID string, currentScore int) (string, error)
 	UpdatePlayerPosition(ctx context.Context, playerID, doorID string) error
-	GetPlayerPath(ctx context.Context, playerID string) ([]string, error)
+	GetPlayerPath(ctx context.Context, playerID string) (*models.PlayerPath, error)
+	UpdatePlayerPath(ctx context.Context, playerPath *models.PlayerPath) error
 	CalculateOptimalPath(ctx context.Context, playerID string, scores []int) ([]string, error)
 }
 
@@ -104,11 +107,15 @@ func (r *PlayerPathRepositoryImpl) UpdatePlayerPosition(ctx context.Context, pla
 	return nil
 }
 
-// GetPlayerPath retrieves the complete path taken by a player
-func (r *PlayerPathRepositoryImpl) GetPlayerPath(ctx context.Context, playerID string) ([]string, error) {
+// GetPlayerPath retrieves the complete path information for a player
+func (r *PlayerPathRepositoryImpl) GetPlayerPath(ctx context.Context, playerID string) (*models.PlayerPath, error) {
+	// Get player information and visited doors
 	query := `
-		MATCH (p:Player {id: $playerId})-[:VISITED]->(door:Door)
-		RETURN door.id as doorId
+		MATCH (p:Player {id: $playerId})
+		OPTIONAL MATCH (p)-[:VISITED]->(door:Door)
+		RETURN p.currentPosition as currentPosition, 
+		       collect(door.id) as doorsVisited,
+		       p.createdAt as createdAt
 		ORDER BY door.createdAt
 	`
 	
@@ -121,13 +128,90 @@ func (r *PlayerPathRepositoryImpl) GetPlayerPath(ctx context.Context, playerID s
 		return nil, fmt.Errorf("failed to get player path: %w", err)
 	}
 	
-	var path []string
-	for _, record := range result.Records {
-		doorID, _ := record.Get("doorId")
-		path = append(path, doorID.(string))
+	if len(result.Records) == 0 {
+		// Return a default path if player not found
+		return &models.PlayerPath{
+			PlayerID:          playerID,
+			Theme:             "general",
+			CurrentDifficulty: 1,
+			DoorsVisited:      []string{},
+			CurrentPosition:   0,
+			TotalDoors:        10, // Default total doors
+			CreatedAt:         time.Now(),
+		}, nil
 	}
 	
-	return path, nil
+	record := result.Records[0]
+	currentPosition, _ := record.Get("currentPosition")
+	doorsVisited, _ := record.Get("doorsVisited")
+	createdAt, _ := record.Get("createdAt")
+	
+	// Convert doors visited to string slice
+	var doors []string
+	if doorsVisited != nil {
+		if doorList, ok := doorsVisited.([]interface{}); ok {
+			for _, door := range doorList {
+				if doorStr, ok := door.(string); ok {
+					doors = append(doors, doorStr)
+				}
+			}
+		}
+	}
+	
+	// Determine current difficulty based on position
+	difficulty := 1
+	if len(doors) > 3 {
+		difficulty = 2
+	}
+	if len(doors) > 6 {
+		difficulty = 3
+	}
+	
+	playerPath := &models.PlayerPath{
+		PlayerID:          playerID,
+		Theme:             "general", // Default theme, could be enhanced to track actual theme
+		CurrentDifficulty: difficulty,
+		DoorsVisited:      doors,
+		CurrentPosition:   currentPosition.(int),
+		TotalDoors:        10, // Default, could be calculated based on path type
+		CreatedAt:         createdAt.(time.Time),
+	}
+	
+	return playerPath, nil
+}
+
+// UpdatePlayerPath updates the player's path information in Neo4j
+func (r *PlayerPathRepositoryImpl) UpdatePlayerPath(ctx context.Context, playerPath *models.PlayerPath) error {
+	// Update player node with path information
+	query := `
+		MERGE (p:Player {id: $playerId})
+		SET p.currentPosition = $currentPosition,
+		    p.totalDoors = $totalDoors,
+		    p.currentDifficulty = $currentDifficulty,
+		    p.theme = $theme
+		WITH p
+		// Mark doors as visited
+		UNWIND $doorsVisited as doorId
+		MERGE (door:Door {id: doorId})
+		MERGE (p)-[:VISITED]->(door)
+		RETURN p
+	`
+	
+	params := map[string]interface{}{
+		"playerId":          playerPath.PlayerID,
+		"currentPosition":   playerPath.CurrentPosition,
+		"totalDoors":        playerPath.TotalDoors,
+		"currentDifficulty": playerPath.CurrentDifficulty,
+		"theme":             playerPath.Theme,
+		"doorsVisited":      playerPath.DoorsVisited,
+	}
+	
+	_, err := r.neo4j.ExecuteQuery(ctx, query, params)
+	if err != nil {
+		return fmt.Errorf("failed to update player path: %w", err)
+	}
+	
+	return nil
 }
 
 // CalculateOptimalPath calculates the optimal path for a player based on their scores

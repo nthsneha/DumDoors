@@ -1,0 +1,100 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+// Simple test to verify WebSocket functionality
+func main() {
+	// Test server URL (assuming server is running on localhost:8080)
+	baseURL := "http://localhost:8080"
+	wsURL := "ws://localhost:8080"
+
+	// First, create a game session
+	sessionResp, err := createTestSession(baseURL)
+	if err != nil {
+		log.Fatalf("Failed to create session: %v", err)
+	}
+
+	sessionID := sessionResp["session"].(map[string]interface{})["sessionId"].(string)
+	fmt.Printf("Created session: %s\n", sessionID)
+
+	// Test WebSocket connection
+	testWebSocketConnection(wsURL, sessionID, "test-player-1")
+}
+
+func createTestSession(baseURL string) (map[string]interface{}, error) {
+	payload := map[string]interface{}{
+		"mode":     "single-player",
+		"playerId": "test-player-1",
+		"username": "TestPlayer1",
+	}
+
+	jsonData, _ := json.Marshal(payload)
+	resp, err := http.Post(baseURL+"/api/game/create", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func testWebSocketConnection(wsURL, sessionID, playerID string) {
+	// Connect to WebSocket
+	url := fmt.Sprintf("%s/api/ws/connect?sessionId=%s&playerId=%s", wsURL, sessionID, playerID)
+	
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	
+	conn, _, err := dialer.Dial(url, nil)
+	if err != nil {
+		log.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer conn.Close()
+
+	fmt.Println("WebSocket connection established!")
+
+	// Listen for messages
+	go func() {
+		for {
+			var msg map[string]interface{}
+			if err := conn.ReadJSON(&msg); err != nil {
+				log.Printf("Read error: %v", err)
+				return
+			}
+			fmt.Printf("Received message: %v\n", msg)
+		}
+	}()
+
+	// Send a test message
+	testMsg := map[string]interface{}{
+		"type":    "test",
+		"message": "Hello from test client!",
+	}
+
+	if err := conn.WriteJSON(testMsg); err != nil {
+		log.Printf("Write error: %v", err)
+		return
+	}
+
+	fmt.Println("Test message sent!")
+
+	// Keep connection alive for a few seconds
+	time.Sleep(5 * time.Second)
+	fmt.Println("WebSocket test completed successfully!")
+}
