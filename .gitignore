@@ -114,7 +114,6 @@ docker-compose.override.yml
 *~
 .cursor/
 .cursorignore
-.kiro/
 
 # OS
 .DS_Store
