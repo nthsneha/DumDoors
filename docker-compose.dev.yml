@@ -1,0 +1,39 @@
+version: '3.8'
+
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Development databases only (no application services)
+  mongodb:
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: dumdoors
+
+  neo4j:
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./database/neo4j-init:/var/lib/neo4j/import
+    environment:
+      NEO4J_AUTH: neo4j/password
+
+  redis:
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass password
+
+  # Remove application services for development
+  backend:
+    profiles:
+      - production
+
+  ai-service:
+    profiles:
+      - production

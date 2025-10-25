@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Databases
+  mongodb:
+    image: mongo:7.0
+    container_name: dumdoors-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-dumdoors}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - dumdoors-network
+
+  neo4j:
+    image: neo4j:5.15
+    container_name: dumdoors-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-password}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./database/neo4j-init:/var/lib/neo4j/import
+    networks:
+      - dumdoors-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: dumdoors-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dumdoors-network
+
+  # Application Services
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dumdoors-backend
+    restart: unless-stopped
+    environment:
+      - PORT=${BACKEND_PORT:-8080}
+      - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password}@mongodb:27017/${MONGO_DATABASE:-dumdoors}?authSource=admin
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
+      - REDIS_URI=redis://:${REDIS_PASSWORD:-password}@redis:6379
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret}
+      - DEVVIT_SUBREDDIT=${DEVVIT_SUBREDDIT}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      - mongodb
+      - neo4j
+      - redis
+      - ai-service
+    networks:
+      - dumdoors-network
+    volumes:
+      - ./backend:/app
+    command: ["./wait-for-it.sh", "mongodb:27017", "--", "./wait-for-it.sh", "neo4j:7687", "--", "go", "run", "main.go"]
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: dumdoors-ai-service
+    restart: unless-stopped
+    environment:
+      - PORT=${AI_SERVICE_PORT:-8000}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-password}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL_PROVIDER=${AI_MODEL_PROVIDER:-openai}
+    ports:
+      - "${AI_SERVICE_PORT:-8000}:8000"
+    depends_on:
+      - neo4j
+    networks:
+      - dumdoors-network
+    volumes:
+      - ./ai-service:/app
+
+volumes:
+  mongodb_data:
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+
+networks:
+  dumdoors-network:
+    driver: bridge
