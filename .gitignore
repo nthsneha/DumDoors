@@ -106,12 +106,15 @@ redis_data/
 .dockerignore
 docker-compose.override.yml
 
-# IDE
+# IDE and Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.cursor/
+.cursorignore
+.kiro/
 
 # OS
 .DS_Store
