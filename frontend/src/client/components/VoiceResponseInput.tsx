@@ -29,8 +29,11 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       // Check if we're in a secure context (HTTPS or localhost)
       const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
       
-      // Check for speech recognition API
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      // Check for speech recognition API with Firefox compatibility
+      const SpeechRecognition = (window as any).SpeechRecognition || 
+                               (window as any).webkitSpeechRecognition || 
+                               (window as any).mozSpeechRecognition ||
+                               (window as any).msSpeechRecognition;
       
       // Check for media devices
       const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -42,6 +45,19 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         hasMicrophone = devices.some(device => device.kind === 'audioinput');
       } catch (e) {
         console.log('Could not enumerate devices:', e);
+        hasMicrophone = true; // Assume microphone exists if we can't check
+      }
+      
+      const browserInfo = getBrowserInfo();
+      
+      // Firefox specific handling
+      let speechSupported = false;
+      if (browserInfo === 'Firefox') {
+        // Firefox requires media.webspeech.recognition.enable = true in about:config
+        // We'll enable the button but show a helpful message
+        speechSupported = isSecureContext && hasMediaDevices;
+      } else {
+        speechSupported = !!SpeechRecognition && isSecureContext && hasMediaDevices;
       }
       
       // Log debug info
@@ -53,10 +69,11 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         userAgent: navigator.userAgent,
         protocol: window.location.protocol,
         hostname: window.location.hostname,
-        browser: getBrowserInfo()
+        browser: browserInfo,
+        speechSupported
       });
       
-      setSpeechSupported(!!SpeechRecognition && isSecureContext && hasMediaDevices);
+      setSpeechSupported(speechSupported);
     };
     
     checkSpeechSupport();
@@ -69,6 +86,21 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
     if (ua.includes('Safari')) return 'Safari';
     if (ua.includes('Edge')) return 'Edge';
     return 'Unknown';
+  };
+
+  const getVoiceInputStatus = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || 
+                             (window as any).webkitSpeechRecognition || 
+                             (window as any).mozSpeechRecognition ||
+                             (window as any).msSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      return 'Click microphone for voice input';
+    } else if (getBrowserInfo() === 'Firefox') {
+      return 'Voice input available (needs Firefox config)';
+    } else {
+      return 'Voice input not supported in this browser';
+    }
   };
 
   // Auto-focus textarea
@@ -95,7 +127,19 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
   };
 
   const handleVoiceInput = async () => {
-    if (!speechSupported) {
+    const browserInfo = getBrowserInfo();
+    const SpeechRecognition = (window as any).SpeechRecognition || 
+                             (window as any).webkitSpeechRecognition || 
+                             (window as any).mozSpeechRecognition ||
+                             (window as any).msSpeechRecognition;
+
+    // Firefox specific handling
+    if (browserInfo === 'Firefox' && !SpeechRecognition) {
+      alert('Firefox requires enabling speech recognition:\n\n1. Type "about:config" in the address bar\n2. Search for "media.webspeech.recognition.enable"\n3. Set it to "true"\n4. Restart Firefox\n\nAlternatively, use Chrome or Edge for better speech recognition support.');
+      return;
+    }
+
+    if (!SpeechRecognition) {
       const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
       if (!isSecureContext) {
         alert('Speech recognition requires HTTPS. Please use a secure connection.');
@@ -104,8 +148,6 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       }
       return;
     }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (isListening) {
       // Stop listening
@@ -126,68 +168,68 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       recognition.interimResults = true;
       recognition.lang = 'en-US';
       recognition.maxAlternatives = 1;
-    } catch (permissionError) {
-      console.error('Microphone permission denied:', permissionError);
-      alert('Microphone permission is required for voice input. Please allow microphone access and try again.');
-      return;
-    }
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      if (finalTranscript) {
-        setResponse(prev => {
-          const newText = prev + (prev ? ' ' : '') + finalTranscript;
-          return newText.slice(0, maxLength);
-        });
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
       
-      // Provide user-friendly error messages
-      switch (event.error) {
-        case 'not-allowed':
-          alert('Microphone access was denied. Please allow microphone permissions and try again.');
-          break;
-        case 'no-speech':
-          console.log('No speech detected, stopping...');
-          break;
-        case 'audio-capture':
-          alert('No microphone found. Please check your microphone connection.');
-          break;
-        case 'network':
-          alert('Network error occurred. Please check your internet connection.');
-          break;
-        default:
-          console.log('Speech recognition error:', event.error);
+      // Firefox specific settings
+      if (browserInfo === 'Firefox') {
+        recognition.continuous = false; // Firefox works better with single recognition
+        recognition.interimResults = false;
       }
-    };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
 
-    try {
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          setResponse(prev => {
+            const newText = prev + (prev ? ' ' : '') + finalTranscript;
+            return newText.slice(0, maxLength);
+          });
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        // Provide user-friendly error messages
+        switch (event.error) {
+          case 'not-allowed':
+            alert('Microphone access was denied. Please allow microphone permissions and try again.');
+            break;
+          case 'no-speech':
+            console.log('No speech detected, stopping...');
+            break;
+          case 'audio-capture':
+            alert('No microphone found. Please check your microphone connection.');
+            break;
+          case 'network':
+            alert('Network error occurred. Please check your internet connection.');
+            break;
+          default:
+            console.log('Speech recognition error:', event.error);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
       recognition.start();
-    } catch (startError) {
-      console.error('Failed to start speech recognition:', startError);
+    } catch (error) {
+      console.error('Failed to start speech recognition:', error);
       setIsListening(false);
       alert('Failed to start voice recognition. Please try again.');
     }
@@ -217,45 +259,53 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="relative z-50" style={{ position: 'relative', zIndex: 50 }}>
-        <textarea
-          ref={textareaRef}
-          value={response}
-          onChange={(e) => setResponse(e.target.value.slice(0, maxLength))}
-          placeholder={placeholder}
-          disabled={disabled || timeLeft === 0}
-          className="w-full min-h-[120px] max-h-[300px] p-4 bg-white/20 border-2 border-white/40 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ 
-            fontSize: '16px', 
-            pointerEvents: 'auto', 
-            position: 'relative', 
-            zIndex: 9999,
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            cursor: 'text'
-          }}
-        />
+      {/* Input Area with External Mic Button */}
+      <div className="flex gap-3 items-start">
+        <div className="flex-1 relative z-50" style={{ position: 'relative', zIndex: 50 }}>
+          <textarea
+            ref={textareaRef}
+            value={response}
+            onChange={(e) => setResponse(e.target.value.slice(0, maxLength))}
+            placeholder={placeholder}
+            disabled={disabled || timeLeft === 0}
+            className="w-full min-h-[120px] max-h-[300px] p-4 bg-white/20 border-2 border-white/40 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ 
+              fontSize: '16px', 
+              pointerEvents: 'auto', 
+              position: 'relative', 
+              zIndex: 9999,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              cursor: 'text'
+            }}
+          />
+        </div>
         
-        {/* Voice Input Button */}
+        {/* Voice Input Button - Outside text area */}
         {speechSupported && (
           <button
             type="button"
             onClick={handleVoiceInput}
             disabled={disabled || timeLeft === 0}
-            className={`absolute bottom-4 right-4 p-3 rounded-full transition-all duration-200 ${
+            className={`flex-shrink-0 p-4 rounded-full transition-all duration-300 transform ${
               isListening 
-                ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                : 'bg-blue-500 hover:bg-blue-600'
-            } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-            title={isListening ? 'Stop recording' : 'Start voice input'}
+                ? 'bg-red-500 hover:bg-red-600 animate-pulse scale-110 shadow-red-500/50' 
+                : 'bg-blue-500 hover:bg-blue-600 hover:scale-105 shadow-blue-500/30'
+            } text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl`}
+            title={isListening ? 'Click to stop recording' : 'Click to start voice input'}
+            style={{ minHeight: '56px', minWidth: '56px' }}
           >
             {isListening ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a2 2 0 114 0v4a2 2 0 11-4 0V7z" clipRule="evenodd" />
+              // Stop/Pause Icon
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
               </svg>
             ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+              // Microphone Icon
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                <path d="M12 18v4"/>
+                <path d="M8 22h8"/>
               </svg>
             )}
           </button>
@@ -281,20 +331,12 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
 
       {/* Debug Info */}
       <div className="text-xs text-gray-400 text-center space-y-1">
-        <div>Press Ctrl+Enter to submit • {speechSupported ? 'Click microphone for voice input' : 'Voice input not supported'}</div>
-        <button 
-          type="button" 
-          onClick={() => {
-            console.log('Test button clicked - textarea should be clickable');
-            if (textareaRef.current) {
-              textareaRef.current.focus();
-              console.log('Focused textarea');
-            }
-          }}
-          className="text-blue-400 hover:text-blue-300 underline"
-        >
-          Test Focus
-        </button>
+        <div>Press Ctrl+Enter to submit • {getVoiceInputStatus()}</div>
+        {getBrowserInfo() === 'Firefox' && !speechSupported && (
+          <div className="text-yellow-400">
+            Firefox users: Enable speech recognition in about:config → media.webspeech.recognition.enable
+          </div>
+        )}
       </div>
     </form>
   );

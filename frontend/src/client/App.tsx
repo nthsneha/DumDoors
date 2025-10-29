@@ -412,14 +412,14 @@ export const App = () => {
           <div className="absolute bottom-4 left-4 z-10">
             <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-xl">
-                    {username ? username.charAt(0).toUpperCase() : 'P'}
+                    {username ? username.charAt(0).toUpperCase() : 'R'}
                   </span>
                 </div>
                 <div className="text-white">
-                  <p className="font-semibold">{username || 'Player'}</p>
-                  <p className="text-sm text-blue-200">Level 1</p>
+                  <p className="font-semibold">u/{username || 'anonymous'}</p>
+                  <p className="text-sm text-orange-200">Reddit User</p>
                 </div>
               </div>
             </div>
@@ -433,7 +433,7 @@ export const App = () => {
                 <div className="text-sm text-blue-200 mb-1">🏆 Best: --</div>
                 <div className="flex items-center gap-2 justify-end">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm">Online: 1,337</span>
+                  <span className="text-sm">Online</span>
                 </div>
               </div>
             </div>
@@ -553,17 +553,26 @@ export const App = () => {
                       autoPlay
                       muted
                       playsInline
+                      preload="auto"
                       className="w-full h-full object-cover rounded-3xl"
                       onEnded={handleAnimationEnd}
                       onError={(e) => {
-                        console.log('Door animation failed to load:', e);
-                        setShowDoorAnimation(false);
+                        console.error('Door animation failed to load:', e);
+                        console.error('Video element:', e.target);
+                        // Try to continue without animation
+                        setTimeout(() => {
+                          handleAnimationEnd();
+                        }, 2000); // Wait 2 seconds then continue
                       }}
                       onLoadStart={() => console.log('Door animation loading...')}
                       onCanPlay={() => console.log('Door animation can play')}
                       onPlay={() => console.log('Door animation started playing')}
+                      onLoadedData={() => console.log('Door animation data loaded')}
+                      onLoadedMetadata={() => console.log('Door animation metadata loaded')}
                     >
                       <source src="/dooranimation.mp4" type="video/mp4" />
+                      <source src="./dooranimation.mp4" type="video/mp4" />
+                      <source src="dooranimation.mp4" type="video/mp4" />
                       Your browser does not support the video tag.
                     </video>
                   </div>

@@ -53,8 +53,16 @@ class GeminiService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Server error: ${response.status}`);
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (jsonError) {
+          console.warn('Failed to parse error response as JSON:', jsonError);
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const analysis = await response.json();
