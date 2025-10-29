@@ -325,7 +325,7 @@ export const App = () => {
               onClick={handleLogin}
               className="bg-gradient-to-r from-blue-600/90 to-blue-700/90 backdrop-blur-sm text-white px-12 py-4 rounded-xl font-semibold text-xl hover:from-blue-700/90 hover:to-blue-800/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border border-white/20"
             >
-              Start Game
+              Enter Game
             </button>
           </div>
         </div>
@@ -338,26 +338,24 @@ export const App = () => {
     return (
       <ErrorBoundary>
         <div className="relative min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 overflow-hidden">
-          {/* Fullscreen Logo */}
+          {/* Fullscreen Menu Background */}
           <img
-            src="/logo.png"
-            alt="DumDoors Logo"
+            src="/menu.jpg"
+            alt="DumDoors Menu"
             className="absolute inset-0 w-full h-full object-cover animate-fade-in"
             onLoad={() => {
-              console.log('Menu logo loaded successfully');
+              console.log('Menu background loaded successfully');
             }}
             onError={(e) => {
-              console.log('Menu logo failed to load, showing fallback');
+              console.log('Menu background failed to load, showing fallback');
               e.currentTarget.style.display = 'none';
             }}
           />
           
-          {/* Fallback Logo Text - Only shows if image fails */}
+          {/* Fallback - Only shows if image fails */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <h1 className="text-6xl lg:text-8xl font-bold text-white mb-4 drop-shadow-2xl animate-fade-in">
-                DUM<span className="text-blue-300">DOORS</span>
-              </h1>
+              {/* No fallback text - just let the gradient background show */}
             </div>
           </div>
           
@@ -441,28 +439,38 @@ export const App = () => {
             </div>
           </div>
 
-          {/* BOTTOM CENTER - Menu Buttons */}
+          {/* BOTTOM CENTER - Tagline and Menu Buttons */}
           <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="grid grid-cols-2 gap-6">
-              <button
-                onClick={handleStartGame}
-                className="bg-gradient-to-r from-blue-600/90 to-blue-700/90 backdrop-blur-sm text-white px-8 py-8 rounded-xl font-bold text-lg hover:from-blue-700/90 hover:to-blue-800/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border border-white/20"
-              >
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-4xl">🎮</span>
-                  <span>Start New Game</span>
+            <div className="flex flex-col items-center gap-6">
+              {/* Tagline */}
+              <div className="text-center mb-2">
+                <div className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 text-2xl font-black tracking-wider animate-pulse drop-shadow-lg">
+                  ✨ CHOOSE YOUR FATE ✨
                 </div>
-              </button>
+              </div>
+              
+              {/* Buttons */}
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={handleStartGame}
+                  className="bg-gradient-to-r from-amber-500/90 via-orange-500/90 to-red-500/90 backdrop-blur-sm text-white px-12 py-4 rounded-xl font-bold text-lg hover:from-amber-600/90 hover:via-orange-600/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-amber-400/40 hover:border-amber-300/60 hover:shadow-amber-500/25"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="text-2xl">🎮</span>
+                    <span>Start New Game</span>
+                  </div>
+                </button>
 
-              <button
-                onClick={handleViewLeaderboard}
-                className="bg-gradient-to-r from-blue-700/90 to-blue-800/90 backdrop-blur-sm text-white px-8 py-8 rounded-xl font-bold text-lg hover:from-blue-800/90 hover:to-blue-900/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border border-white/20"
-              >
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-4xl">🏆</span>
-                  <span>Leaderboard</span>
-                </div>
-              </button>
+                <button
+                  onClick={handleViewLeaderboard}
+                  className="bg-gradient-to-r from-purple-600/90 via-blue-600/90 to-cyan-500/90 backdrop-blur-sm text-white px-12 py-4 rounded-xl font-bold text-lg hover:from-purple-700/90 hover:via-blue-700/90 hover:to-cyan-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-purple-400/40 hover:border-purple-300/60 hover:shadow-purple-500/25"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="text-2xl">🏆</span>
+                    <span>Leaderboard</span>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
