@@ -570,9 +570,9 @@ export const App = () => {
                       onLoadedData={() => console.log('Door animation data loaded')}
                       onLoadedMetadata={() => console.log('Door animation metadata loaded')}
                     >
-                      <source src="/dooranimation.mp4" type="video/mp4" />
-                      <source src="./dooranimation.mp4" type="video/mp4" />
-                      <source src="dooranimation.mp4" type="video/mp4" />
+                      <source src={`/dooranimation.mp4?v=${Date.now()}`} type="video/mp4" />
+                      <source src={`./dooranimation.mp4?v=${Date.now()}`} type="video/mp4" />
+                      <source src={`dooranimation.mp4?v=${Date.now()}`} type="video/mp4" />
                       Your browser does not support the video tag.
                     </video>
                   </div>
