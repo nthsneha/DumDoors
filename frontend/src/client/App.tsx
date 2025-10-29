@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCounter } from './hooks/useCounter';
 import { useBackgroundMusic } from './hooks/useBackgroundMusic';
+import { useSoundEffects } from './hooks/useSoundEffects';
 import { Leaderboard, GameResults } from './components';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GameMinimap } from './components/GameMinimap';
@@ -39,7 +40,8 @@ interface GamePath {
 
 export const App = () => {
   const { username } = useCounter();
-  const { isPlaying, isMuted, toggleMusic, toggleMute } = useBackgroundMusic();
+  const { isMuted, toggleMute } = useBackgroundMusic();
+  const { isSoundEnabled, isLoaded: soundsLoaded, playScoreSound, toggleSoundEffects, testSound } = useSoundEffects();
   const { handleError, errorState, clearError } = useErrorHandler({
     maxRetries: 3,
     retryDelay: 2000,
@@ -106,6 +108,10 @@ export const App = () => {
 
   const handleLogin = () => {
     setGameState('menu');
+    // Enable audio context on first user interaction
+    if (soundsLoaded) {
+      console.log('🔊 Enabling audio context on user interaction');
+    }
   };
 
   const handleStartGame = () => {
@@ -258,6 +264,9 @@ export const App = () => {
 
       // Store the analysis for display
       setCurrentAnalysis(scoreResponse);
+
+      // Play sound effect based on score
+      playScoreSound(scoreResponse.total_score);
 
       // Update door color based on score
       const score = scoreResponse.total_score;
@@ -417,26 +426,42 @@ export const App = () => {
           {/* TOP RIGHT CORNER - Control Buttons */}
           <div className="absolute top-4 right-4 z-10">
             <div className="flex gap-3">
-              {/* Music Control */}
-              <button
-                onClick={toggleMusic}
-                className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
-                  isPlaying ? 'ring-2 ring-green-500' : ''
-                }`}
-                title={isPlaying ? 'Pause Music' : 'Play Music'}
-              >
-                <div className="text-white text-xl">{isPlaying ? '⏸️' : '🎵'}</div>
-              </button>
-
               {/* Volume Control */}
               <button
                 onClick={toggleMute}
                 className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
                   isMuted ? 'ring-2 ring-red-500' : ''
                 }`}
-                title={isMuted ? 'Unmute' : 'Mute'}
+                title={isMuted ? 'Unmute Music' : 'Mute Music'}
               >
                 <div className="text-white text-xl">{isMuted ? '🔇' : '🔊'}</div>
+              </button>
+
+              {/* Sound Effects Control */}
+              <button
+                onClick={toggleSoundEffects}
+                className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
+                  isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' : 
+                  isSoundEnabled && !soundsLoaded ? 'ring-2 ring-yellow-500' : 
+                  'ring-2 ring-gray-500'
+                }`}
+                title={
+                  !soundsLoaded ? 'Sound Effects (Files Missing)' :
+                  isSoundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'
+                }
+              >
+                <div className="text-white text-xl">
+                  {!soundsLoaded ? '⚠️' : isSoundEnabled ? '🔔' : '🔕'}
+                </div>
+              </button>
+
+              {/* Test Sound Button (for debugging) */}
+              <button
+                onClick={testSound}
+                className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all"
+                title="Test Sound Effects"
+              >
+                <div className="text-white text-xl">🧪</div>
               </button>
 
               {/* Settings */}

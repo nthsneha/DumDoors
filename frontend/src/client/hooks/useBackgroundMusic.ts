@@ -1,64 +1,85 @@
 import { useState, useEffect, useRef } from 'react';
 
 export const useBackgroundMusic = () => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    useEffect(() => {
-        // Create audio element with a sample music URL (you can replace with your own)
-        audioRef.current = new Audio('/music.mp3');
-        audioRef.current.loop = true;
-        audioRef.current.volume = 0.3; // Set to 30% volume
+  useEffect(() => {
+    // Create audio element with a sample music URL (you can replace with your own)
+    audioRef.current = new Audio('/music/theme_song.mp3');
+    audioRef.current.loop = true;
+    audioRef.current.volume = 0.3; // Set to 30% volume
 
-        // Handle audio events
-        const audio = audioRef.current;
+    // Handle audio events
+    const audio = audioRef.current;
 
-        const handleCanPlay = () => {
-            console.log('Background music loaded');
-        };
+    const handleCanPlay = async () => {
+      console.log('Background music loaded');
+      setIsLoaded(true);
 
-        const handleError = () => {
-            console.log('Background music failed to load - using silence');
-        };
+      // Auto-play music when loaded
+      try {
+        await audio.play();
+        console.log('Background music started automatically');
+      } catch (error) {
+        console.log('Auto-play blocked by browser, music will start on user interaction:', error);
+      }
+    };
 
-        audio.addEventListener('canplay', handleCanPlay);
-        audio.addEventListener('error', handleError);
+    const handleError = () => {
+      console.log('Background music failed to load - using silence');
+      setIsLoaded(false);
+    };
 
-        return () => {
-            audio.removeEventListener('canplay', handleCanPlay);
-            audio.removeEventListener('error', handleError);
-            audio.pause();
-        };
-    }, []);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
 
-    const toggleMusic = async () => {
-        if (!audioRef.current) return;
+    return () => {
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
+      audio.pause();
+    };
+  }, []);
 
-        try {
-            if (isPlaying) {
-                audioRef.current.pause();
-                setIsPlaying(false);
-            } else {
-                await audioRef.current.play();
-                setIsPlaying(true);
-            }
-        } catch (error) {
-            console.log('Could not play background music:', error);
+  // Auto-start music on first user interaction if not already playing
+  useEffect(() => {
+    const startMusicOnInteraction = async () => {
+      if (!audioRef.current || !isLoaded) return;
+
+      try {
+        if (audioRef.current.paused) {
+          await audioRef.current.play();
+          console.log('Background music started on user interaction');
         }
+      } catch (error) {
+        console.log('Could not start background music:', error);
+      }
     };
 
-    const toggleMute = () => {
-        if (!audioRef.current) return;
+    // Add event listeners for user interaction
+    const events = ['click', 'keydown', 'touchstart'];
+    events.forEach((event) => {
+      document.addEventListener(event, startMusicOnInteraction, { once: true });
+    });
 
-        audioRef.current.muted = !isMuted;
-        setIsMuted(!isMuted);
+    return () => {
+      events.forEach((event) => {
+        document.removeEventListener(event, startMusicOnInteraction);
+      });
     };
+  }, [isLoaded]);
 
-    return {
-        isPlaying,
-        isMuted,
-        toggleMusic,
-        toggleMute
-    };
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+
+    audioRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  return {
+    isMuted,
+    isLoaded,
+    toggleMute,
+  };
 };
