@@ -41,7 +41,7 @@ interface GamePath {
 export const App = () => {
   const { username } = useCounter();
   const { isMuted, toggleMute } = useBackgroundMusic();
-  const { isSoundEnabled, isLoaded: soundsLoaded, playScoreSound, toggleSoundEffects, testSound } = useSoundEffects();
+  const { isSoundEnabled, isLoaded: soundsLoaded, playScoreSound, toggleSoundEffects } = useSoundEffects();
   const { handleError, errorState, clearError } = useErrorHandler({
     maxRetries: 3,
     retryDelay: 2000,
@@ -453,15 +453,6 @@ export const App = () => {
                 <div className="text-white text-xl">
                   {!soundsLoaded ? '⚠️' : isSoundEnabled ? '🔔' : '🔕'}
                 </div>
-              </button>
-
-              {/* Test Sound Button (for debugging) */}
-              <button
-                onClick={testSound}
-                className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all"
-                title="Test Sound Effects"
-              >
-                <div className="text-white text-xl">🧪</div>
               </button>
 
               {/* Settings */}
