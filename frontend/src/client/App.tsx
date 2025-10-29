@@ -68,6 +68,7 @@ export const App = () => {
   const [showOutcome, setShowOutcome] = useState(false);
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [showDoorAnimation, setShowDoorAnimation] = useState(false);
+  const [showMobileMap, setShowMobileMap] = useState(false);
 
   // Timer for response phase
   useEffect(() => {
@@ -413,34 +414,34 @@ export const App = () => {
           {/* Dark Overlay for Better Button Visibility */}
           <div className="absolute inset-0 bg-black/30"></div>
 
-          {/* TOP LEFT CORNER - Game Title & Version */}
-          <div className="absolute top-4 left-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+          {/* TOP LEFT CORNER - Game Title & Version - Mobile Responsive */}
+          <div className="absolute top-2 left-2 md:top-4 md:left-4 z-10">
+            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
               <div className="text-white text-center">
-                <h3 className="text-lg font-bold mb-1">DumDoors</h3>
-                <p className="text-sm text-blue-200">v1.0.0</p>
+                <h3 className="text-sm md:text-lg font-bold mb-1">DumDoors</h3>
+                <p className="text-xs md:text-sm text-blue-200">v1.0.0</p>
               </div>
             </div>
           </div>
 
-          {/* TOP RIGHT CORNER - Control Buttons */}
-          <div className="absolute top-4 right-4 z-10">
-            <div className="flex gap-3">
+          {/* TOP RIGHT CORNER - Control Buttons - Mobile Responsive */}
+          <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10">
+            <div className="flex gap-1 md:gap-3">
               {/* Volume Control */}
               <button
                 onClick={toggleMute}
-                className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
+                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${
                   isMuted ? 'ring-2 ring-red-500' : ''
                 }`}
                 title={isMuted ? 'Unmute Music' : 'Mute Music'}
               >
-                <div className="text-white text-xl">{isMuted ? '🔇' : '🔊'}</div>
+                <div className="text-white text-sm md:text-xl">{isMuted ? '🔇' : '🔊'}</div>
               </button>
 
               {/* Sound Effects Control */}
               <button
                 onClick={toggleSoundEffects}
-                className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
+                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${
                   isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' : 
                   isSoundEnabled && !soundsLoaded ? 'ring-2 ring-yellow-500' : 
                   'ring-2 ring-gray-500'
@@ -450,77 +451,77 @@ export const App = () => {
                   isSoundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'
                 }
               >
-                <div className="text-white text-xl">
+                <div className="text-white text-sm md:text-xl">
                   {!soundsLoaded ? '⚠️' : isSoundEnabled ? '🔔' : '🔕'}
                 </div>
               </button>
 
               {/* Settings */}
-              <button className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all">
-                <div className="text-white text-xl">⚙️</div>
+              <button className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all">
+                <div className="text-white text-sm md:text-xl">⚙️</div>
               </button>
             </div>
           </div>
 
-          {/* BOTTOM LEFT CORNER - Profile Section */}
-          <div className="absolute bottom-4 left-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">
-                    {username ? username.charAt(0).toUpperCase() : 'P'}
+          {/* BOTTOM LEFT CORNER - Profile Section - Mobile Responsive */}
+          <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 z-10">
+            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-sm md:text-xl">
+                    {username ? username.charAt(0).toUpperCase() : 'R'}
                   </span>
                 </div>
                 <div className="text-white">
-                  <p className="font-semibold">{username || 'Player'}</p>
-                  <p className="text-sm text-blue-200">Level 1</p>
+                  <p className="font-semibold text-xs md:text-base">u/{username || 'anonymous'}</p>
+                  <p className="text-xs md:text-sm text-orange-200">Reddit User</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* BOTTOM RIGHT CORNER - Game Stats */}
-          <div className="absolute bottom-4 right-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+          {/* BOTTOM RIGHT CORNER - Game Stats - Mobile Responsive */}
+          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10">
+            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
               <div className="text-white text-right">
-                <div className="text-sm text-blue-200 mb-1">🎮 Games: 0</div>
-                <div className="text-sm text-blue-200 mb-1">🏆 Best: --</div>
-                <div className="flex items-center gap-2 justify-end">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm">Online: 1,337</span>
+                <div className="text-xs md:text-sm text-blue-200 mb-1">🎮 Games: 0</div>
+                <div className="text-xs md:text-sm text-blue-200 mb-1">🏆 Best: --</div>
+                <div className="flex items-center gap-1 md:gap-2 justify-end">
+                  <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs md:text-sm">Online</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* BOTTOM CENTER - Tagline and Menu Buttons */}
-          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-10">
-            <div className="flex flex-col items-center gap-6">
+          {/* BOTTOM CENTER - Tagline and Menu Buttons - Mobile Responsive */}
+          <div className="absolute bottom-16 md:bottom-20 left-1/2 transform -translate-x-1/2 z-10 px-4 w-full max-w-sm md:max-w-md">
+            <div className="flex flex-col items-center gap-4 md:gap-6">
               {/* Tagline */}
               <div className="text-center mb-2">
-                <div className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 text-2xl font-black tracking-wider animate-pulse drop-shadow-lg">
+                <div className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-red-500 text-lg md:text-2xl font-black tracking-wider animate-pulse drop-shadow-lg">
                   ✨ CHOOSE YOUR FATE ✨
                 </div>
               </div>
 
               {/* Buttons */}
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 md:gap-4 w-full">
                 <button
                   onClick={handleStartGame}
-                  className="bg-gradient-to-r from-amber-500/90 via-orange-500/90 to-red-500/90 backdrop-blur-sm text-white px-12 py-4 rounded-xl font-bold text-lg hover:from-amber-600/90 hover:via-orange-600/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-amber-400/40 hover:border-amber-300/60 hover:shadow-amber-500/25"
+                  className="bg-gradient-to-r from-amber-500/90 via-orange-500/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-amber-600/90 hover:via-orange-600/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-amber-400/40 hover:border-amber-300/60 hover:shadow-amber-500/25"
                 >
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="text-2xl">🎮</span>
+                  <div className="flex items-center justify-center gap-2 md:gap-3">
+                    <span className="text-xl md:text-2xl">🎮</span>
                     <span>Start New Game</span>
                   </div>
                 </button>
 
                 <button
                   onClick={handleViewLeaderboard}
-                  className="bg-gradient-to-r from-purple-600/90 via-blue-600/90 to-cyan-500/90 backdrop-blur-sm text-white px-12 py-4 rounded-xl font-bold text-lg hover:from-purple-700/90 hover:via-blue-700/90 hover:to-cyan-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-purple-400/40 hover:border-purple-300/60 hover:shadow-purple-500/25"
+                  className="bg-gradient-to-r from-purple-600/90 via-blue-600/90 to-cyan-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-purple-700/90 hover:via-blue-700/90 hover:to-cyan-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-purple-400/40 hover:border-purple-300/60 hover:shadow-purple-500/25"
                 >
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="text-2xl">🏆</span>
+                  <div className="flex items-center justify-center gap-2 md:gap-3">
+                    <span className="text-xl md:text-2xl">🏆</span>
                     <span>Leaderboard</span>
                   </div>
                 </button>
@@ -536,7 +537,7 @@ export const App = () => {
   if (gameState === 'playing') {
     return (
       <ErrorBoundary>
-        <div className="relative min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 flex">
+        <div className="relative min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 flex flex-col md:flex-row">
           {/* Full Screen Pulse Overlay */}
           {doorColor !== 'neutral' && currentAnalysis && (
             <div className="fixed inset-0 pointer-events-none z-50">
@@ -600,44 +601,93 @@ export const App = () => {
               )}
             </div>
           )}
-          {/* LEFT SIDE - Map and Info */}
-          <div className="w-1/2 p-4 flex flex-col h-screen">
-            {/* TOP LEFT - Compact Info Section (20% height) */}
-            <div className="mb-4 space-y-3" style={{ height: '20%' }}>
-              <button
-                onClick={handleBackToMenu}
-                className="bg-black/40 backdrop-blur-lg text-white px-3 py-2 rounded-lg hover:bg-black/50 transition-colors border border-white/20 text-sm"
-              >
-                ← Menu
-              </button>
+          {/* Mobile Map Overlay */}
+          {showMobileMap && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 md:hidden flex items-center justify-center p-4">
+              <div className="bg-black/60 backdrop-blur-lg rounded-2xl p-4 w-full max-w-sm h-[70vh] border border-white/20">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white font-bold text-lg">🗺️ Game Map</h3>
+                  <button
+                    onClick={() => setShowMobileMap(false)}
+                    className="bg-red-500/80 text-white px-3 py-1 rounded-lg hover:bg-red-600/80 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="h-full">
+                  <GameMinimap gamePath={gamePath} className="h-full" />
+                </div>
+              </div>
+            </div>
+          )}
 
-              {/* Game Info - Compact */}
-              <div className="bg-black/40 backdrop-blur-lg rounded-xl p-3 border border-white/20">
-                <h3 className="text-white font-semibold mb-2 text-sm">🎮 Game Info</h3>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-gray-300">
-                    <span>Door:</span>
-                    <span className="text-white">
-                      {gamePath.currentPosition + 1}/{gamePath.totalLength}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-gray-300">
-                    <span>Time:</span>
-                    <span className="text-white">{timeLeft}s</span>
+          {/* LEFT SIDE - Map and Info - Desktop Only */}
+          <div className="hidden md:flex md:w-1/2 p-4 flex-col h-screen order-2 md:order-1">
+            {/* Desktop: Vertical Info Section */}
+            <div className="mb-4 space-y-3 h-[20%]">
+              <div className="flex flex-col gap-0 space-y-3">
+                <button
+                  onClick={handleBackToMenu}
+                  className="bg-black/40 backdrop-blur-lg text-white px-3 py-2 rounded-lg hover:bg-black/50 transition-colors border border-white/20 text-sm flex-shrink-0"
+                >
+                  ← Menu
+                </button>
+
+                {/* Game Info */}
+                <div className="bg-black/40 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+                  <h3 className="text-white font-semibold text-sm mb-2">🎮 Game Info</h3>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex gap-1 text-gray-300">
+                      <span>Door:</span>
+                      <span className="text-white">
+                        {gamePath.currentPosition + 1}/{gamePath.totalLength}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 text-gray-300">
+                      <span>Time:</span>
+                      <span className="text-white">{timeLeft}s</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* MAIN - Big Minimap (80% height) */}
-            <div className="flex-1" style={{ height: '80%' }}>
+            {/* Desktop Minimap */}
+            <div className="flex-1 h-[80%]">
               <GameMinimap gamePath={gamePath} className="h-full" />
             </div>
           </div>
 
-          {/* RIGHT SIDE - Big Door */}
-          <div className="w-1/2 p-4 flex items-center justify-center">
-            <div className="relative w-full h-full max-h-[90vh]">
+          {/* Mobile Top Bar */}
+          <div className="md:hidden w-full p-2 order-1">
+            <div className="flex gap-2">
+              <button
+                onClick={handleBackToMenu}
+                className="bg-black/40 backdrop-blur-lg text-white px-2 py-1 rounded-lg hover:bg-black/50 transition-colors border border-white/20 text-xs flex-shrink-0"
+              >
+                ← Menu
+              </button>
+
+              <button
+                onClick={() => setShowMobileMap(true)}
+                className="bg-black/40 backdrop-blur-lg text-white px-2 py-1 rounded-lg hover:bg-black/50 transition-colors border border-white/20 text-xs flex-shrink-0"
+              >
+                🗺️ Map
+              </button>
+
+              {/* Mobile Game Info */}
+              <div className="bg-black/40 backdrop-blur-lg rounded-lg p-2 border border-white/20 flex-1">
+                <div className="flex justify-between text-xs text-white">
+                  <span>Door: {gamePath.currentPosition + 1}/{gamePath.totalLength}</span>
+                  <span>Time: {timeLeft}s</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE - Big Door - Mobile Responsive */}
+          <div className="w-full md:w-1/2 p-2 md:p-4 flex items-center justify-center order-2 md:order-2 flex-1">
+            <div className="relative w-full h-[calc(100vh-80px)] md:h-full max-h-[calc(100vh-80px)] md:max-h-[90vh]">
               {/* Big Door Container */}
               <div className="relative w-full h-full rounded-3xl shadow-2xl pointer-events-none overflow-hidden">
                 {/* Door Image Background */}
@@ -764,36 +814,81 @@ export const App = () => {
                 )}
 
                 {/* Door Content Container */}
-                <div className="absolute inset-6 lg:inset-12 flex flex-col z-10 pointer-events-auto">
-                  {/* Door Status Indicator and Analysis */}
+                <div className="absolute inset-3 md:inset-6 lg:inset-12 flex flex-col z-10 pointer-events-auto">
+                  {/* Scenario Section - Top of Door */}
+                  <div className="mb-2 md:mb-4 lg:mb-8 flex-none md:flex-1 min-h-0">
+                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-3 md:p-4 lg:p-6 border border-white/20 h-32 md:h-full flex flex-col">
+                      <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white mb-2 md:mb-4 flex items-center gap-2 md:gap-3 flex-shrink-0">
+                        📖 <span>Current Scenario</span>
+                      </h2>
+                      {currentScenario ? (
+                        <div className="flex-1 overflow-y-auto">
+                          <p className="text-gray-100 text-sm md:text-base lg:text-lg leading-relaxed">
+                            {currentScenario.content}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 text-gray-300 flex-1 justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                          <span className="text-base md:text-lg">Loading scenario...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Response Input Section - Middle of Door */}
+                  {!waitingForNext && !showOutcome && (
+                    <div className="flex-1 min-h-0">
+                      <div className="bg-black/30 backdrop-blur-lg rounded-xl p-3 md:p-4 lg:p-6 border border-white/20 h-full flex flex-col">
+                        <h3 className="text-base md:text-lg lg:text-xl font-bold text-white mb-2 md:mb-4 flex items-center gap-2 md:gap-3 flex-shrink-0">
+                          💭 <span>Your Response</span>
+                        </h3>
+
+                        <div className="flex-1">
+                          <VoiceResponseInput
+                            onSubmit={handleSubmitResponse}
+                            timeLeft={timeLeft}
+                            maxLength={CONFIG.GAME.MAX_RESPONSE_LENGTH}
+                            placeholder="Describe what you would do in this situation..."
+                            disabled={isSubmitting || !currentScenario || waitingForNext}
+                            autoFocus={true}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Door Status Indicator and Analysis - Bottom of Door */}
                   {showOutcome && currentAnalysis && (
-                    <div className="mb-4 lg:mb-6 text-center">
-                      <div
-                        className={`inline-block px-4 lg:px-6 py-2 lg:py-3 rounded-full text-white font-bold text-lg lg:text-xl backdrop-blur-lg border-2 mb-4 ${
-                          currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
-                            ? 'bg-green-500/80 border-green-300'
+                    <div className="flex-1 min-h-0 flex flex-col">
+                      <div className="text-center mb-2 md:mb-4 flex-shrink-0">
+                        <div
+                          className={`inline-block px-3 md:px-4 lg:px-6 py-1 md:py-2 lg:py-3 rounded-full text-white font-bold text-base md:text-lg lg:text-xl backdrop-blur-lg border-2 ${
+                            currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
+                              ? 'bg-green-500/80 border-green-300'
+                              : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
+                                ? 'bg-red-500/80 border-red-300'
+                                : 'bg-yellow-500/80 border-yellow-300'
+                          } animate-fade-in`}
+                        >
+                          Score: {Math.round(currentAnalysis.total_score)}/100{' '}
+                          {currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
+                            ? '😊'
                             : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
-                              ? 'bg-red-500/80 border-red-300'
-                              : 'bg-yellow-500/80 border-yellow-300'
-                        } animate-fade-in`}
-                      >
-                        Score: {Math.round(currentAnalysis.total_score)}/100{' '}
-                        {currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
-                          ? '😊'
-                          : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
-                            ? '😞'
-                            : '😐'}
+                              ? '😞'
+                              : '😐'}
+                        </div>
                       </div>
 
                       {/* AI Response */}
-                      <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 lg:p-6 border border-white/30 mb-4 animate-slide-in-up">
-                        <h3 className="text-lg lg:text-xl font-bold text-white mb-3 flex items-center gap-2">
+                      <div className="bg-black/40 backdrop-blur-lg rounded-xl p-3 md:p-4 lg:p-6 border border-white/30 animate-slide-in-up flex-1 min-h-0 flex flex-col">
+                        <h3 className="text-base md:text-lg lg:text-xl font-bold text-white mb-2 md:mb-3 flex items-center gap-2 flex-shrink-0">
                           🤖 <span>AI Response</span>
                         </h3>
 
                         {currentAnalysis.feedback && (
-                          <div className="p-4 bg-black/20 rounded-lg">
-                            <div className="text-white text-base lg:text-lg leading-relaxed">
+                          <div className="p-3 md:p-4 bg-black/20 rounded-lg mb-3 md:mb-4 flex-1 overflow-y-auto">
+                            <div className="text-white text-sm md:text-base lg:text-lg leading-relaxed">
                               {currentAnalysis.feedback}
                             </div>
                           </div>
@@ -801,10 +896,10 @@ export const App = () => {
 
                         {/* Next Button */}
                         {waitingForNext && (
-                          <div className="text-center">
+                          <div className="text-center flex-shrink-0">
                             <button
                               onClick={handleNextScenario}
-                              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-3 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transform hover:scale-105 transition-all duration-200 shadow-lg animate-pulse"
+                              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 md:px-8 py-2 md:py-3 rounded-xl font-semibold text-base md:text-lg hover:from-blue-700 hover:to-blue-800 transform hover:scale-105 transition-all duration-200 shadow-lg animate-pulse"
                             >
                               Continue to Next Door →
                             </button>
@@ -813,43 +908,6 @@ export const App = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* Scenario Section - Top of Door */}
-                  <div className="mb-4 lg:mb-8">
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 lg:p-6 border border-white/20">
-                      <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 flex items-center gap-3">
-                        📖 <span>Current Scenario</span>
-                      </h2>
-                      {currentScenario ? (
-                        <p className="text-gray-100 text-base lg:text-lg leading-relaxed">
-                          {currentScenario.content}
-                        </p>
-                      ) : (
-                        <div className="flex items-center gap-3 text-gray-300">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                          <span className="text-lg">Loading scenario...</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Response Input Section - Bottom of Door */}
-                  <div className="flex-1 flex flex-col justify-end">
-                    <div className="bg-black/30 backdrop-blur-lg rounded-xl p-4 lg:p-6 border border-white/20">
-                      <h3 className="text-lg lg:text-xl font-bold text-white mb-4 flex items-center gap-3">
-                        💭 <span>Your Response</span>
-                      </h3>
-
-                      <VoiceResponseInput
-                        onSubmit={handleSubmitResponse}
-                        timeLeft={timeLeft}
-                        maxLength={CONFIG.GAME.MAX_RESPONSE_LENGTH}
-                        placeholder="Describe what you would do in this situation..."
-                        disabled={isSubmitting || !currentScenario || waitingForNext}
-                        autoFocus={true}
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 {/* Processing Overlay */}
