@@ -5,43 +5,150 @@ import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from models.door import ScoringResult, ScoringRequest, ScoringMetrics
+from models.door import ScoringResult, ScoringRequest, ScoringMetrics, EvaluationWithOutcomeResponse
 from services.ai_client import AIClient
-from services.neo4j_service import Neo4jService
+from services.answer_comparison_engine import AnswerComparisonEngine
+from services.reasoning_analyzer import ReasoningAnalyzer
+from services.scoring_calculator import ScoringCalculator
+from services.outcome_generator import OutcomeGenerator
+from services.path_recommendation_engine import PathRecommendationEngine
+from services.scenario_repository import ScenarioRepository
+from services.expected_answer_manager import ExpectedAnswerManager
 
 logger = logging.getLogger(__name__)
 
 class ScoringService:
-    """Service for scoring player responses"""
+    """Enhanced service for scoring player responses with comprehensive evaluation"""
     
-    def __init__(self, ai_client: AIClient):
+    def __init__(self, ai_client: AIClient, scenario_repository: ScenarioRepository):
         self.ai_client = ai_client
-        self.neo4j_service = Neo4jService()
+        self.scenario_repository = scenario_repository
+        
+        # Initialize new evaluation components
+        self.answer_comparison_engine = AnswerComparisonEngine(ai_client)
+        self.reasoning_analyzer = ReasoningAnalyzer(ai_client)
+        self.scoring_calculator = ScoringCalculator()
+        self.outcome_generator = OutcomeGenerator(ai_client)
+        self.path_recommendation_engine = PathRecommendationEngine()
+        self.expected_answer_manager = ExpectedAnswerManager(scenario_repository)
+        
+        # Keep legacy neo4j service for backward compatibility
+        try:
+            from services.neo4j_service import Neo4jService
+            self.neo4j_service = Neo4jService()
+        except ImportError:
+            logger.warning("Neo4j service not available, some legacy features may not work")
+            self.neo4j_service = None
     
-    async def score_response(self, door_content: str, response: str, context: Optional[Dict[str, Any]] = None) -> ScoringResult:
-        """Score a single player response"""
+    async def evaluate_response_with_outcome(self, scenario_id: str, player_response: str, 
+                                           session_id: Optional[str] = None, 
+                                           context: Optional[Dict[str, Any]] = None) -> EvaluationWithOutcomeResponse:
+        """Enhanced response evaluation with outcomes and path recommendations"""
         start_time = time.time()
         
         try:
-            # Get AI scoring
-            scores = await self.ai_client.score_response(door_content, response, context)
+            # Get the scenario and expected answer
+            scenario = await self.scenario_repository.get_scenario_by_id(scenario_id)
+            if not scenario:
+                raise Exception(f"Scenario not found: {scenario_id}")
+            
+            expected_answer = await self.expected_answer_manager.get_expected_answer(scenario_id)
+            if not expected_answer:
+                raise Exception(f"Expected answer not found for scenario: {scenario_id}")
+            
+            # Perform answer comparison
+            comparison_score = await self.answer_comparison_engine.compare_responses(
+                player_response, expected_answer.answer_text
+            )
+            
+            # Analyze reasoning quality
+            reasoning_score = await self.reasoning_analyzer.evaluate_reasoning_quality(
+                player_response, scenario.content
+            )
+            
+            # Calculate total score
+            total_score = await self.scoring_calculator.calculate_total_score(
+                comparison_score, reasoning_score, expected_answer.scoring_weight
+            )
+            
+            # Determine score category
+            score_category = await self.scoring_calculator.determine_score_category(total_score)
+            
+            # Generate exaggerated outcome
+            exaggerated_outcome = await self.outcome_generator.generate_outcome_by_score(
+                scenario.content, player_response, total_score
+            )
+            
+            # Get path recommendation
+            path_recommendation_data = await self.path_recommendation_engine.get_path_recommendation(total_score)
+            
+            # Get reasoning patterns for feedback
+            reasoning_patterns = await self.reasoning_analyzer.identify_reasoning_patterns(player_response)
+            
+            # Generate detailed feedback
+            scores_dict = {
+                "total_score": total_score,
+                "comparison_score": comparison_score,
+                "reasoning_score": reasoning_score
+            }
+            detailed_feedback = await self.scoring_calculator.generate_detailed_feedback(
+                scores_dict, reasoning_patterns
+            )
+            
+            processing_time = (time.time() - start_time) * 1000
+            
+            return EvaluationWithOutcomeResponse(
+                response_id=str(uuid.uuid4()),
+                scenario_id=scenario_id,
+                total_score=total_score,
+                comparison_score=comparison_score,
+                reasoning_score=reasoning_score,
+                score_category=score_category,
+                exaggerated_outcome=exaggerated_outcome,
+                path_recommendation=path_recommendation_data["path_difficulty"],
+                recommended_node_count=path_recommendation_data["recommended_node_count"],
+                detailed_feedback=detailed_feedback,
+                processing_time_ms=processing_time
+            )
+            
+        except Exception as e:
+            logger.error(f"Enhanced response evaluation failed: {e}")
+            # Return a default response on error
+            processing_time = (time.time() - start_time) * 1000
+            return EvaluationWithOutcomeResponse(
+                response_id=str(uuid.uuid4()),
+                scenario_id=scenario_id,
+                total_score=50.0,
+                comparison_score=50.0,
+                reasoning_score=50.0,
+                score_category="average",
+                exaggerated_outcome="Unable to generate outcome due to evaluation error.",
+                path_recommendation="medium",
+                recommended_node_count=6,
+                detailed_feedback="Evaluation encountered an error. Please try again.",
+                processing_time_ms=processing_time
+            )
+
+    async def score_response(self, door_content: str, response: str, context: Optional[Dict[str, Any]] = None) -> ScoringResult:
+        """Score a player response and generate exaggerated outcome"""
+        start_time = time.time()
+        
+        try:
+            # Get AI scoring with exaggerated outcome in one call
+            result = await self.ai_client.score_response_with_outcome(door_content, response, context)
             
             # Create scoring metrics
             metrics = ScoringMetrics(
-                creativity=scores.get('creativity', 50.0),
-                feasibility=scores.get('feasibility', 50.0),
-                humor=scores.get('humor', 50.0),
-                originality=scores.get('originality', 50.0)
+                creativity=result.get('creativity', 50.0),
+                feasibility=result.get('feasibility', 50.0),
+                originality=result.get('originality', 50.0)
             )
             
-            # Calculate total score (average of all metrics)
-            total_score = (metrics.creativity + metrics.feasibility + metrics.humor + metrics.originality) / 4
+            # Always calculate total score from individual metrics (don't trust AI's total)
+            total_score = (metrics.creativity + metrics.feasibility + metrics.originality) / 3
             
-            # Determine path recommendation based on score
-            path_recommendation = self._get_path_recommendation(total_score)
-            
-            # Generate feedback (optional)
-            feedback = await self._generate_feedback(door_content, response, metrics)
+            # Get the exaggerated outcome
+            exaggerated_outcome = result.get('exaggerated_outcome', "Your choice leads to unexpected adventures!")
             
             processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
             
@@ -49,8 +156,7 @@ class ScoringService:
                 response_id=str(uuid.uuid4()),
                 total_score=total_score,
                 metrics=metrics,
-                feedback=feedback,
-                path_recommendation=path_recommendation,
+                exaggerated_outcome=exaggerated_outcome,
                 processing_time_ms=processing_time
             )
             
@@ -116,8 +222,7 @@ class ScoringService:
             elif metrics.feasibility <= 30:
                 feedback_parts.append("Consider the practicality of your solution.")
             
-            if metrics.humor >= 70:
-                feedback_parts.append("Great sense of humor!")
+
             
             if metrics.originality >= 80:
                 feedback_parts.append("Unique and original thinking!")
@@ -133,7 +238,6 @@ class ScoringService:
         default_metrics = ScoringMetrics(
             creativity=50.0,
             feasibility=50.0,
-            humor=50.0,
             originality=50.0
         )
         
@@ -141,8 +245,7 @@ class ScoringService:
             response_id=response_id,
             total_score=50.0,
             metrics=default_metrics,
-            feedback="Unable to generate detailed feedback at this time.",
-            path_recommendation="normal_path",
+            exaggerated_outcome="Your choice leads to unexpected adventures!",
             processing_time_ms=0.0
         )
     
@@ -275,6 +378,35 @@ class ScoringService:
         
         return (completed_doors / estimated_total_doors) * 100.0
     
+    async def get_evaluation_statistics(self) -> Dict[str, Any]:
+        """Get statistics about the evaluation system"""
+        try:
+            # Get statistics from all components
+            scoring_stats = self.scoring_calculator.get_scoring_statistics()
+            path_stats = await self.path_recommendation_engine.get_path_statistics()
+            outcome_stats = await self.outcome_generator.get_outcome_statistics()
+            
+            # Validate configurations
+            scoring_validation = await self.scoring_calculator.validate_scoring_configuration()
+            
+            return {
+                "scoring_calculator": scoring_stats,
+                "path_recommendation": path_stats,
+                "outcome_generator": outcome_stats,
+                "configuration_validation": scoring_validation,
+                "evaluation_components": {
+                    "answer_comparison_engine": "active",
+                    "reasoning_analyzer": "active",
+                    "scoring_calculator": "active",
+                    "outcome_generator": "active",
+                    "path_recommendation_engine": "active"
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get evaluation statistics: {e}")
+            return {"error": str(e)}
+
     async def get_scoring_analytics(self, player_id: str) -> Dict[str, Any]:
         """Get detailed scoring analytics for a player"""
         try:
@@ -285,7 +417,6 @@ class ScoringService:
                 "total_responses": 0,  # Would be pulled from database
                 "average_creativity": 0.0,
                 "average_feasibility": 0.0,
-                "average_humor": 0.0,
                 "average_originality": 0.0,
                 "overall_average": 0.0,
                 "improvement_trend": "stable",  # "improving", "declining", "stable"
@@ -293,7 +424,21 @@ class ScoringService:
                 "weakest_metric": "feasibility",
                 "path_efficiency": 85.0,  # Percentage of optimal path taken
                 "doors_skipped": 0,
-                "extra_doors_taken": 0
+                "extra_doors_taken": 0,
+                # Enhanced analytics
+                "average_comparison_score": 0.0,
+                "average_reasoning_score": 0.0,
+                "score_category_distribution": {
+                    "poor": 0,
+                    "average": 0,
+                    "excellent": 0
+                },
+                "path_difficulty_distribution": {
+                    "shorter": 0,
+                    "medium": 0,
+                    "longer": 0
+                },
+                "reasoning_patterns_used": []
             }
             
         except Exception as e:
