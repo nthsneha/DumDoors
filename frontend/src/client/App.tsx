@@ -640,45 +640,37 @@ export const App = () => {
                   </div>
                 </button>
 
-                {gameResponses.length > 0 && (
-                  <button
-                    onClick={handleViewDumStones}
-                    className="bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25"
-                  >
-                    <div className="flex items-center justify-center gap-2 md:gap-3">
-                      <span className="text-xl md:text-2xl">🪦</span>
-                      <span>DumStone</span>
-                    </div>
-                  </button>
-                )}
-
-                {/* Test DumStones button - always visible for testing */}
+                {/* DumStone Button - Always visible, locked until first game played */}
                 <button
-                  onClick={() => {
-                    console.log('🃏 [DEBUG] Test DumStones button clicked');
-                    const testReport = {
-                      title: "The Friend-Dependent Fixer",
-                      personality: "A simple soul who believes most problems can be solved by either fleeing or borrowing.",
-                      roast: "Your decision-making process is a thrilling journey from 'run away!' to 'ask a friend!'",
-                      strengths: ["Self-preservation", "Networking", "Delegation", "Knowing limitations"],
-                      weaknesses: ["Independence", "Confidence", "Decision-making", "Standing ground"],
-                      funnyQuote: "If I can't run from it, I'll just ask a friend if they have a spare solution.",
-                      overallGrade: "D- (Barely Surviving, Thanks to Friends)",
-                      emoji: "😬"
-                    };
-                    setDumStoneReport(testReport);
-                    setGameState('dumstones');
-                  }}
-                  className="bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25"
+                  onClick={gameResponses.length > 0 ? handleViewDumStones : undefined}
+                  disabled={gameResponses.length === 0}
+                  className={`px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg transition-all duration-200 shadow-2xl border-2 ${
+                    gameResponses.length > 0
+                      ? 'bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25 cursor-pointer'
+                      : 'bg-gradient-to-r from-gray-600/50 via-gray-700/50 to-gray-800/50 backdrop-blur-sm text-gray-400 border-gray-500/40 cursor-not-allowed opacity-60'
+                  }`}
+                  title={gameResponses.length === 0 ? 'Play at least one game to unlock your DumStone' : 'View your DumStone'}
                 >
                   <div className="flex items-center justify-center gap-2 md:gap-3">
                     <span className="text-xl md:text-2xl">🪦</span>
-                    <span>Test DumStone</span>
+                    <span>DumStone</span>
+                    {gameResponses.length === 0 && (
+                      <span className="text-lg">🔒</span>
+                    )}
                   </div>
                 </button>
 
 
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Floating Multi-Player Notice - Central Bottom */}
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-[500px] max-w-[90vw] overflow-hidden bg-gradient-to-r from-orange-600/80 via-orange-500/80 to-amber-600/80 backdrop-blur-sm border border-white/20 rounded-lg shadow-lg">
+          <div className="relative h-10 flex items-center">
+            <div className="animate-marquee whitespace-nowrap text-white font-bold text-base tracking-wide">
+              🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮
             </div>
           </div>
         </div>

@@ -67,7 +67,12 @@ interface SessionProgress {
   updatedAt: string;
 }
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error';
+export type ConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'error';
 
 interface UseGameSessionOptions {
   sessionId: string;
@@ -111,7 +116,7 @@ export const useGameSession = (options: UseGameSessionOptions) => {
     onLeaderboardUpdate,
     onGameCompleted,
     onConnectionRestored,
-    onError
+    onError,
   } = options;
 
   const wsErrorHandler = useWebSocketErrorHandler({
@@ -130,7 +135,7 @@ export const useGameSession = (options: UseGameSessionOptions) => {
     reconnectAttempts: wsErrorHandler.errorState.retryCount,
     isReconnecting: wsErrorHandler.errorState.hasError,
     lastHeartbeat: null,
-    connectionQuality: 'unknown'
+    connectionQuality: 'unknown',
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -161,19 +166,19 @@ export const useGameSession = (options: UseGameSessionOptions) => {
 
   // Update connection status
   const updateConnectionStatus = useCallback((status: ConnectionStatus, error?: string) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       connectionStatus: status,
       lastError: error || null,
       isReconnecting: status === 'reconnecting',
-      connectionQuality: status === 'connected' ? 'good' : prev.connectionQuality
+      connectionQuality: status === 'connected' ? 'good' : prev.connectionQuality,
     }));
   }, []);
 
   // Update connection quality based on heartbeat response times
   const updateConnectionQuality = useCallback((responseTime: number) => {
     let quality: 'excellent' | 'good' | 'poor' | 'unknown';
-    
+
     if (responseTime < 100) {
       quality = 'excellent';
     } else if (responseTime < 500) {
@@ -181,211 +186,161 @@ export const useGameSession = (options: UseGameSessionOptions) => {
     } else {
       quality = 'poor';
     }
-    
-    setState(prev => ({
+
+    setState((prev) => ({
       ...prev,
       connectionQuality: quality,
-      lastHeartbeat: new Date()
+      lastHeartbeat: new Date(),
     }));
   }, []);
 
   // Handle WebSocket events
-  const handleWebSocketEvent = useCallback((event: WebSocketEvent) => {
-    console.log('WebSocket event received:', event);
+  const handleWebSocketEvent = useCallback(
+    (event: WebSocketEvent) => {
+      console.log('WebSocket event received:', event);
 
-    switch (event.type) {
-      case 'connection-established':
-        updateConnectionStatus('connected');
-        if (event.data.session) {
-          setState(prev => ({ ...prev, session: event.data.session }));
-          onSessionUpdate?.(event.data.session);
-        }
-        onConnectionRestored?.();
-        break;
+      switch (event.type) {
+        case 'connection-established':
+          updateConnectionStatus('connected');
+          if (event.data.session) {
+            setState((prev) => ({ ...prev, session: event.data.session }));
+            onSessionUpdate?.(event.data.session);
+          }
+          onConnectionRestored?.();
+          break;
 
-      case 'player-connected':
-      case 'player-joined':
-        if (event.playerId && event.playerId !== playerId) {
-          const username = event.data?.username || event.data?.playerId;
-          onPlayerJoined?.(event.playerId, username);
-          
-          // Update session state if we have player info
-          if (event.data?.playerInfo) {
-            setState(prev => {
+        case 'player-connected':
+        case 'player-joined':
+          if (event.playerId && event.playerId !== playerId) {
+            const username = event.data?.username || event.data?.playerId;
+            onPlayerJoined?.(event.playerId, username);
+
+            // Update session state if we have player info
+            if (event.data?.playerInfo) {
+              setState((prev) => {
+                if (!prev.session) return prev;
+
+                const updatedPlayers = [...prev.session.players];
+                const existingIndex = updatedPlayers.findIndex(
+                  (p) => p.playerId === event.playerId
+                );
+
+                if (existingIndex === -1) {
+                  updatedPlayers.push(event.data.playerInfo);
+                } else {
+                  updatedPlayers[existingIndex] = {
+                    ...updatedPlayers[existingIndex],
+                    ...event.data.playerInfo,
+                  };
+                }
+
+                const updatedSession = { ...prev.session, players: updatedPlayers };
+                onSessionUpdate?.(updatedSession);
+                return { ...prev, session: updatedSession };
+              });
+            }
+          }
+          break;
+
+        case 'player-disconnected':
+        case 'player-left':
+          if (event.playerId && event.playerId !== playerId) {
+            const username = event.data?.username || event.data?.playerId;
+            onPlayerLeft?.(event.playerId, username);
+
+            // Update player status in session
+            setState((prev) => {
               if (!prev.session) return prev;
-              
-              const updatedPlayers = [...prev.session.players];
-              const existingIndex = updatedPlayers.findIndex(p => p.playerId === event.playerId);
-              
-              if (existingIndex === -1) {
-                updatedPlayers.push(event.data.playerInfo);
-              } else {
-                updatedPlayers[existingIndex] = { ...updatedPlayers[existingIndex], ...event.data.playerInfo };
-              }
-              
+
+              const updatedPlayers = prev.session.players.map((player) => {
+                if (player.playerId === event.playerId) {
+                  return { ...player, isActive: false };
+                }
+                return player;
+              });
+
               const updatedSession = { ...prev.session, players: updatedPlayers };
               onSessionUpdate?.(updatedSession);
               return { ...prev, session: updatedSession };
             });
           }
-        }
-        break;
+          break;
 
-      case 'player-disconnected':
-      case 'player-left':
-        if (event.playerId && event.playerId !== playerId) {
-          const username = event.data?.username || event.data?.playerId;
-          onPlayerLeft?.(event.playerId, username);
-          
-          // Update player status in session
-          setState(prev => {
-            if (!prev.session) return prev;
-            
-            const updatedPlayers = prev.session.players.map(player => {
-              if (player.playerId === event.playerId) {
-                return { ...player, isActive: false };
-              }
-              return player;
+        case 'player-reconnected':
+          if (event.playerId && event.playerId !== playerId) {
+            const username = event.data?.username || event.data?.playerId;
+            onPlayerReconnected?.(event.playerId, username);
+
+            // Update player status in session
+            setState((prev) => {
+              if (!prev.session) return prev;
+
+              const updatedPlayers = prev.session.players.map((player) => {
+                if (player.playerId === event.playerId) {
+                  return { ...player, isActive: true };
+                }
+                return player;
+              });
+
+              const updatedSession = { ...prev.session, players: updatedPlayers };
+              onSessionUpdate?.(updatedSession);
+              return { ...prev, session: updatedSession };
             });
-            
-            const updatedSession = { ...prev.session, players: updatedPlayers };
-            onSessionUpdate?.(updatedSession);
-            return { ...prev, session: updatedSession };
-          });
-        }
-        break;
+          }
+          break;
 
-      case 'player-reconnected':
-        if (event.playerId && event.playerId !== playerId) {
-          const username = event.data?.username || event.data?.playerId;
-          onPlayerReconnected?.(event.playerId, username);
-          
-          // Update player status in session
-          setState(prev => {
-            if (!prev.session) return prev;
-            
-            const updatedPlayers = prev.session.players.map(player => {
-              if (player.playerId === event.playerId) {
-                return { ...player, isActive: true };
-              }
-              return player;
-            });
-            
-            const updatedSession = { ...prev.session, players: updatedPlayers };
-            onSessionUpdate?.(updatedSession);
-            return { ...prev, session: updatedSession };
-          });
-        }
-        break;
-
-      case 'door-presented':
-      case 'game:door-presented':
-        const doorData: DoorPresentedData = {
-          door: event.data.door || event.data,
-          timeoutSeconds: event.data.timeoutSeconds || 60
-        };
-        onDoorPresented?.(doorData);
-        
-        // Update session with current door
-        setState(prev => {
-          if (!prev.session) return prev;
-          
-          const updatedSession = {
-            ...prev.session,
-            currentDoor: doorData.door,
-            status: 'active' as const
+        case 'door-presented':
+        case 'game:door-presented':
+          const doorData: DoorPresentedData = {
+            door: event.data.door || event.data,
+            timeoutSeconds: event.data.timeoutSeconds || 60,
           };
-          
-          onSessionUpdate?.(updatedSession);
-          return { ...prev, session: updatedSession };
-        });
-        break;
+          onDoorPresented?.(doorData);
 
-      case 'scores-updated':
-      case 'game:scores-updated':
-      case 'player-score-update':
-        const scoreData: ScoreUpdateData = {
-          playerId: event.playerId || event.data.playerId,
-          newScore: event.data.newScore,
-          totalScore: event.data.totalScore,
-          scoringMetrics: event.data.scoringMetrics
-        };
-        onScoresUpdated?.(scoreData);
-        
-        // Update player score in session
-        setState(prev => {
-          if (!prev.session) return prev;
-          
-          const updatedPlayers = prev.session.players.map(player => {
-            if (player.playerId === scoreData.playerId) {
-              return {
-                ...player,
-                totalScore: scoreData.totalScore,
-                responses: player.responses.map(response => 
-                  response.responseId === event.data.responseId 
-                    ? { ...response, aiScore: scoreData.newScore, scoringMetrics: scoreData.scoringMetrics || response.scoringMetrics }
-                    : response
-                )
-              };
-            }
-            return player;
-          });
-          
-          const updatedSession = { ...prev.session, players: updatedPlayers };
-          onSessionUpdate?.(updatedSession);
-          return { ...prev, session: updatedSession };
-        });
-        break;
-
-      case 'progress-update':
-        if (event.data && event.data.players) {
-          onProgressUpdate?.(event.data);
-          
-          // Update session with new player progress
-          setState(prev => {
+          // Update session with current door
+          setState((prev) => {
             if (!prev.session) return prev;
-            
-            const updatedPlayers = prev.session.players.map(player => {
-              const progressData = event.data.players.find((p: PlayerProgress) => p.playerId === player.playerId);
-              if (progressData) {
-                return {
-                  ...player,
-                  currentPosition: progressData.currentPosition,
-                  totalScore: progressData.totalScore,
-                  isActive: progressData.isActive
-                };
-              }
-              return player;
-            });
 
             const updatedSession = {
               ...prev.session,
-              players: updatedPlayers,
-              status: event.data.gameStatus || prev.session.status
+              currentDoor: doorData.door,
+              status: 'active' as const,
             };
 
             onSessionUpdate?.(updatedSession);
             return { ...prev, session: updatedSession };
           });
-        }
-        break;
+          break;
 
-      case 'player-position-update':
-        if (event.playerId && event.data) {
-          onPlayerPositionUpdate?.(
-            event.playerId,
-            event.data.currentPosition,
-            event.data.totalDoors
-          );
-          
-          setState(prev => {
+        case 'scores-updated':
+        case 'game:scores-updated':
+        case 'player-score-update':
+          const scoreData: ScoreUpdateData = {
+            playerId: event.playerId || event.data.playerId,
+            newScore: event.data.newScore,
+            totalScore: event.data.totalScore,
+            scoringMetrics: event.data.scoringMetrics,
+          };
+          onScoresUpdated?.(scoreData);
+
+          // Update player score in session
+          setState((prev) => {
             if (!prev.session) return prev;
-            
-            const updatedPlayers = prev.session.players.map(player => {
-              if (player.playerId === event.playerId) {
+
+            const updatedPlayers = prev.session.players.map((player) => {
+              if (player.playerId === scoreData.playerId) {
                 return {
                   ...player,
-                  currentPosition: event.data.currentPosition
+                  totalScore: scoreData.totalScore,
+                  responses: player.responses.map((response) =>
+                    response.responseId === event.data.responseId
+                      ? {
+                          ...response,
+                          aiScore: scoreData.newScore,
+                          scoringMetrics: scoreData.scoringMetrics || response.scoringMetrics,
+                        }
+                      : response
+                  ),
                 };
               }
               return player;
@@ -395,101 +350,167 @@ export const useGameSession = (options: UseGameSessionOptions) => {
             onSessionUpdate?.(updatedSession);
             return { ...prev, session: updatedSession };
           });
-        }
-        break;
+          break;
 
-      case 'leaderboard-update':
-        if (event.data && event.data.leaderboard) {
-          onLeaderboardUpdate?.(event.data.leaderboard);
-        }
-        break;
+        case 'progress-update':
+          if (event.data && event.data.players) {
+            onProgressUpdate?.(event.data);
 
-      case 'game-completed':
-      case 'game:game-completed':
-      case 'final-rankings':
-        const gameResults: GameCompletedData = {
-          winner: event.data.winner,
-          rankings: event.data.rankings || [],
-          statistics: event.data.statistics || []
-        };
-        onGameCompleted?.(gameResults);
-        
-        // Update session status
-        setState(prev => {
-          if (!prev.session) return prev;
-          
-          const updatedSession = {
-            ...prev.session,
-            status: 'completed' as const,
-            completedAt: new Date().toISOString()
+            // Update session with new player progress
+            setState((prev) => {
+              if (!prev.session) return prev;
+
+              const updatedPlayers = prev.session.players.map((player) => {
+                const progressData = event.data.players.find(
+                  (p: PlayerProgress) => p.playerId === player.playerId
+                );
+                if (progressData) {
+                  return {
+                    ...player,
+                    currentPosition: progressData.currentPosition,
+                    totalScore: progressData.totalScore,
+                    isActive: progressData.isActive,
+                  };
+                }
+                return player;
+              });
+
+              const updatedSession = {
+                ...prev.session,
+                players: updatedPlayers,
+                status: event.data.gameStatus || prev.session.status,
+              };
+
+              onSessionUpdate?.(updatedSession);
+              return { ...prev, session: updatedSession };
+            });
+          }
+          break;
+
+        case 'player-position-update':
+          if (event.playerId && event.data) {
+            onPlayerPositionUpdate?.(
+              event.playerId,
+              event.data.currentPosition,
+              event.data.totalDoors
+            );
+
+            setState((prev) => {
+              if (!prev.session) return prev;
+
+              const updatedPlayers = prev.session.players.map((player) => {
+                if (player.playerId === event.playerId) {
+                  return {
+                    ...player,
+                    currentPosition: event.data.currentPosition,
+                  };
+                }
+                return player;
+              });
+
+              const updatedSession = { ...prev.session, players: updatedPlayers };
+              onSessionUpdate?.(updatedSession);
+              return { ...prev, session: updatedSession };
+            });
+          }
+          break;
+
+        case 'leaderboard-update':
+          if (event.data && event.data.leaderboard) {
+            onLeaderboardUpdate?.(event.data.leaderboard);
+          }
+          break;
+
+        case 'game-completed':
+        case 'game:game-completed':
+        case 'final-rankings':
+          const gameResults: GameCompletedData = {
+            winner: event.data.winner,
+            rankings: event.data.rankings || [],
+            statistics: event.data.statistics || [],
           };
-          
-          onSessionUpdate?.(updatedSession);
-          return { ...prev, session: updatedSession };
-        });
-        break;
+          onGameCompleted?.(gameResults);
 
-      case 'performance-statistics':
-        console.log('Performance statistics:', event.data);
-        break;
+          // Update session status
+          setState((prev) => {
+            if (!prev.session) return prev;
 
-      case 'heartbeat-response':
-        // Handle heartbeat response for connection quality monitoring
-        const responseTime = Date.now() - (event.data?.timestamp || 0);
-        updateConnectionQuality(responseTime);
-        break;
+            const updatedSession = {
+              ...prev.session,
+              status: 'completed' as const,
+              completedAt: new Date().toISOString(),
+            };
 
-      case 'error':
-        const errorMessage = event.data?.message || 'WebSocket error occurred';
-        updateConnectionStatus('error', errorMessage);
-        onError?.(errorMessage);
-        break;
+            onSessionUpdate?.(updatedSession);
+            return { ...prev, session: updatedSession };
+          });
+          break;
 
-      default:
-        console.log('Unhandled WebSocket event:', event.type, event.data);
-    }
-  }, [
-    playerId, 
-    onSessionUpdate, 
-    onPlayerJoined, 
-    onPlayerLeft, 
-    onPlayerReconnected,
-    onDoorPresented, 
-    onScoresUpdated, 
-    onProgressUpdate,
-    onPlayerPositionUpdate,
-    onLeaderboardUpdate,
-    onGameCompleted, 
-    onConnectionRestored,
-    onError, 
-    updateConnectionStatus,
-    updateConnectionQuality
-  ]);
+        case 'performance-statistics':
+          console.log('Performance statistics:', event.data);
+          break;
+
+        case 'heartbeat-response':
+          // Handle heartbeat response for connection quality monitoring
+          const responseTime = Date.now() - (event.data?.timestamp || 0);
+          updateConnectionQuality(responseTime);
+          break;
+
+        case 'error':
+          const errorMessage = event.data?.message || 'WebSocket error occurred';
+          updateConnectionStatus('error', errorMessage);
+          onError?.(errorMessage);
+          break;
+
+        default:
+          console.log('Unhandled WebSocket event:', event.type, event.data);
+      }
+    },
+    [
+      playerId,
+      onSessionUpdate,
+      onPlayerJoined,
+      onPlayerLeft,
+      onPlayerReconnected,
+      onDoorPresented,
+      onScoresUpdated,
+      onProgressUpdate,
+      onPlayerPositionUpdate,
+      onLeaderboardUpdate,
+      onGameCompleted,
+      onConnectionRestored,
+      onError,
+      updateConnectionStatus,
+      updateConnectionQuality,
+    ]
+  );
 
   // Send heartbeat to keep connection alive and monitor quality
   const sendHeartbeat = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const heartbeatTime = Date.now();
-      
-      wsRef.current.send(JSON.stringify({
-        type: 'heartbeat',
-        timestamp: heartbeatTime,
-        sessionId,
-        playerId
-      }));
-      
+
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'heartbeat',
+          timestamp: heartbeatTime,
+          sessionId,
+          playerId,
+        })
+      );
+
       // Set timeout for heartbeat response
       if (heartbeatTimeoutRef.current) {
         clearTimeout(heartbeatTimeoutRef.current);
       }
-      
+
       heartbeatTimeoutRef.current = setTimeout(() => {
         // No heartbeat response received, connection might be poor
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          connectionQuality: 'poor'
+          connectionQuality: 'poor',
         }));
-        
+
         console.warn('Heartbeat timeout - connection quality degraded');
       }, heartbeatTimeout);
     }
@@ -520,9 +541,9 @@ export const useGameSession = (options: UseGameSessionOptions) => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       const wsUrl = `${protocol}//${host}/ws?sessionId=${encodeURIComponent(sessionId)}&playerId=${encodeURIComponent(playerId)}`;
-      
+
       console.log('Connecting to WebSocket:', wsUrl);
-      
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -540,11 +561,11 @@ export const useGameSession = (options: UseGameSessionOptions) => {
         console.log('WebSocket connected');
         wsErrorHandler.handleConnectionSuccess();
         updateConnectionStatus('connected');
-        setState(prev => ({ 
-          ...prev, 
+        setState((prev) => ({
+          ...prev,
           reconnectAttempts: 0,
           connectionQuality: 'good',
-          lastHeartbeat: new Date()
+          lastHeartbeat: new Date(),
         }));
         startHeartbeat();
       };
@@ -552,13 +573,13 @@ export const useGameSession = (options: UseGameSessionOptions) => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Update last activity timestamp
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
-            lastHeartbeat: new Date()
+            lastHeartbeat: new Date(),
           }));
-          
+
           handleWebSocketEvent(data);
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error, event.data);
@@ -570,9 +591,9 @@ export const useGameSession = (options: UseGameSessionOptions) => {
         clearTimeout(connectionTimeout);
         console.log('WebSocket closed:', event.code, event.reason);
         clearTimers();
-        
+
         wsErrorHandler.handleConnectionClose(event);
-        
+
         // Handle different close codes
         if (event.code === 1000) {
           // Normal closure
@@ -600,17 +621,25 @@ export const useGameSession = (options: UseGameSessionOptions) => {
         updateConnectionStatus('error', 'WebSocket connection error');
         onError?.('WebSocket connection error');
       };
-
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       updateConnectionStatus('error', 'Failed to create WebSocket connection');
       onError?.('Failed to create WebSocket connection');
     }
-  }, [sessionId, playerId, updateConnectionStatus, handleWebSocketEvent, startHeartbeat, clearTimers, onError, attemptReconnect]);
+  }, [
+    sessionId,
+    playerId,
+    updateConnectionStatus,
+    handleWebSocketEvent,
+    startHeartbeat,
+    clearTimers,
+    onError,
+    attemptReconnect,
+  ]);
 
   // Attempt to reconnect with exponential backoff
   const attemptReconnect = useCallback(() => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.reconnectAttempts >= maxReconnectAttempts) {
         updateConnectionStatus('error', 'Maximum reconnection attempts exceeded');
         onError?.('Connection lost. Please refresh the page.');
@@ -618,17 +647,19 @@ export const useGameSession = (options: UseGameSessionOptions) => {
       }
 
       updateConnectionStatus('reconnecting');
-      
+
       const delay = reconnectDelay * Math.pow(2, prev.reconnectAttempts);
-      console.log(`Attempting to reconnect in ${delay}ms (attempt ${prev.reconnectAttempts + 1}/${maxReconnectAttempts})`);
-      
+      console.log(
+        `Attempting to reconnect in ${delay}ms (attempt ${prev.reconnectAttempts + 1}/${maxReconnectAttempts})`
+      );
+
       reconnectTimeoutRef.current = setTimeout(() => {
         connect();
       }, delay);
 
       return {
         ...prev,
-        reconnectAttempts: prev.reconnectAttempts + 1
+        reconnectAttempts: prev.reconnectAttempts + 1,
       };
     });
   }, [connect, updateConnectionStatus, onError]);
@@ -636,12 +667,12 @@ export const useGameSession = (options: UseGameSessionOptions) => {
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
     clearTimers();
-    
+
     if (wsRef.current) {
       wsRef.current.close(1000, 'Client disconnect');
       wsRef.current = null;
     }
-    
+
     updateConnectionStatus('disconnected');
   }, [clearTimers, updateConnectionStatus]);
 
@@ -687,6 +718,6 @@ export const useGameSession = (options: UseGameSessionOptions) => {
     isConnected: state.connectionStatus === 'connected',
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
   };
 };

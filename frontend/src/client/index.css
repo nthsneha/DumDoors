@@ -225,3 +225,70 @@
 .animate-crystal-shine {
   animation: crystal-shine 2s ease-in-out infinite;
 }
+
+/* Tombstone engraved text effects - Enhanced for realistic stone carving */
+.text-engraved {
+  text-shadow: 
+    1px 1px 0px rgba(0, 0, 0, 0.9),
+    -1px -1px 0px rgba(255, 255, 255, 0.4),
+    0px 2px 3px rgba(0, 0, 0, 0.6),
+    0px 0px 1px rgba(0, 0, 0, 0.8);
+  color: #374151; /* gray-700 */
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.text-engraved-deep {
+  text-shadow: 
+    2px 2px 0px rgba(0, 0, 0, 1),
+    -2px -2px 0px rgba(255, 255, 255, 0.5),
+    0px 3px 5px rgba(0, 0, 0, 0.8),
+    0px 0px 2px rgba(0, 0, 0, 0.9),
+    inset 0px 1px 0px rgba(0, 0, 0, 0.4);
+  color: #1f2937; /* gray-800 */
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.tombstone-shadow {
+  box-shadow: 
+    0 12px 24px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes tombstone-glow {
+  0%, 100% { 
+    box-shadow: 
+      0 12px 24px rgba(0, 0, 0, 0.5),
+      inset 0 2px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+      0 0 15px rgba(156, 163, 175, 0.3);
+  }
+  50% { 
+    box-shadow: 
+      0 12px 24px rgba(0, 0, 0, 0.5),
+      inset 0 2px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+      0 0 25px rgba(156, 163, 175, 0.6);
+  }
+}
+
+.animate-tombstone-glow {
+  animation: tombstone-glow 4s ease-in-out infinite;
+}
+
+/* Marquee animation for floating notices */
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}

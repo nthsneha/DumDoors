@@ -2,6 +2,7 @@ import express from 'express';
 import { InitResponse, IncrementResponse, DecrementResponse } from '../shared/types/api';
 import { redis, reddit, createServer, context, getServerPort, settings } from '@devvit/web/server';
 import { createPost } from './core/post';
+import { createSplashScreen } from './core/splash';
 import { leaderboardService } from './services/leaderboardService';
 import { redditIntegrationService } from './services/redditIntegrationService';
 
@@ -18,6 +19,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.text());
 
 const router = express.Router();
+
+// Splash screen endpoint
+router.get('/splash', async (_req, res): Promise<void> => {
+  try {
+    const splashHtml = createSplashScreen();
+    res.setHeader('Content-Type', 'text/html');
+    res.send(splashHtml);
+  } catch (error) {
+    console.error('Splash screen error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to generate splash screen',
+    });
+  }
+});
 
 router.get<{ postId: string }, InitResponse | { status: string; message: string }>(
   '/api/init',

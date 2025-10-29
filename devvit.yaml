@@ -10,6 +10,8 @@ post:
   entrypoints:
     default:
       entry: index.html
+  splash:
+    url: /splash
 server:
   dir: frontend/dist/server
   entry: index.cjs
