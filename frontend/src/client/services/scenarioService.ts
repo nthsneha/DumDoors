@@ -13,42 +13,33 @@ class ScenarioService {
     if (this.isLoaded) return;
 
     try {
-      // CSV data from the dataset
-      const csvData = `scenario,reasoning
-"You're cycling in a narrow path and you see a herd of bulls charging at you.","WORST move: Cycling furiously toward them like you're starring in your own action movie - congratulations, you're now a human pancake and the bulls are telling their grandkids about 'that idiot cyclist.' BEST move: Calmly dismount and step aside like a matador with common sense. Even in the most exaggerated outcome, you're alive to tell the embarrassing story at dinner parties instead of being the cautionary tale parents tell their kids."
-"You wake up one day and see that your entire body is flakey.","WORST decision: Panic-scratch yourself into a snowstorm of skin confetti while screaming about spontaneous mummification. You'll look like a human parmesan grater went rogue. BEST decision: Moisturize like your life depends on it and call a dermatologist. Even exaggerated, you might be shiny as a disco ball for a day, but at least you're not bleeding from scratching yourself raw and getting a staph infection that makes you actually fall apart."
-"You are allergic to laughter and attending a stand up show.","WORST move: Stay in your seat out of politeness and laugh along, resulting in your face swelling up like a balloon animal until you look like the Michelin Man's distant cousin. BEST move: Leave immediately or pop antihistamines like candy. Exaggerated outcome? You miss some jokes but keep your ability to breathe. The alternative is being carried out on a stretcher while the comedian makes you part of their set."
-"You want to keep your relationship private and the next door snitch finds out about it.","WORST decision: Threaten them with creative violence or offer bribes that escalate into a full blackmail situation worthy of a bad soap opera. BEST decision: Have a mature conversation about boundaries. Even exaggerated, the worst that happens is they gossip a bit and people say 'oh, neat.' The alternative is a restraining order and explaining to police why you offered your neighbor $5000 in cash and a kidney."
-"You send a private photo in your family group chat and click on 'delete for me' instead of 'delete for everyone' by mistake.","WORST move: Fake your own death and move to another country, leaving your family wondering if you were abducted by aliens who needed that specific photo. BEST move: Immediately send a casual 'wrong chat, my bad!' and laugh it off. Exaggerated best case: mild embarrassment for a week. Exaggerated worst case from fleeing: your face on milk cartons and a family convinced you're in witness protection."
-"Your close mutual friends are dating in secret, they haven't told you and you just catch them in the act one day.","WORST decision: Gasp dramatically, demand explanations, and interrogate them like a jealous ex-partner until they break up just to escape the drama you've created. BEST decision: Smile, say 'about time!' and walk away. Exaggerated best outcome: you're the cool friend who gets invited to the wedding. Exaggerated worst outcome: you're the reason there IS no wedding and both friends hate you forever."
-"Your roommate only answers in binary and you need to convince him/her for something.","WORST move: Scream in regular English louder and louder like volume fixes language barriers, eventually having a breakdown and crying in the corner. BEST move: Learn basic binary or ask yes/no questions strategically. Exaggerated best case: you have a quirky conversation and get what you need. Worst case: you're known as 'that roommate who couldn't figure out 1s and 0s' and still don't have toilet paper."
-"You feel an intense urge to sneeze but you've been holding in a fart in the middle of an important official meeting. You can't go to the washroom.","WORST move: Let both rip simultaneously, creating a biological symphony that gets you internet famous as 'Double Trouble' in the corporate fail compilation. BEST move: Fake a coughing fit that covers the sneeze and strategically release the other threat. Exaggerated best case: people think you're getting sick and offer you sympathy. Worst case: you become a meme and your grandchildren find it in 2045."
-"Someone locked you in the washroom and you don't have your phone with you.","WORST decision: Immediately start panic-crying and trying to drink from the toilet because you've clearly watched too many survival shows. BEST decision: Knock systematically, check the lock mechanism, stay calm. Exaggerated best outcome: someone hears you in 10 minutes. Exaggerated worst outcome from panicking: you flood the bathroom trying to 'send a water signal' and cause $10,000 in damage."
-"You accidentally reply-all to an email complaining about your boss.","WORST move: Send another reply-all trying to explain yourself, creating an email chain of doom that reaches the CEO and gets forwarded to HR with a note about 'workplace communication issues.' BEST move: Send a brief, professional apology directly to your boss and let it blow over. Exaggerated best case: your boss laughs it off. Worst case: you're known as the person who turned a minor complaint into a company-wide spectacle."
-"Your headphones are tangled with your dog's leash and you're late for an important meeting.","WORST decision: Panic-yank everything apart like you're defusing a bomb, resulting in broken headphones, an escaped dog, and showing up to your meeting looking like you wrestled a octopus. BEST decision: Take 30 seconds to carefully untangle them. Exaggerated best case: you're 2 minutes late but composed. Worst case: you're explaining to your boss why there's a search party looking for your dog."
-"You try to cook spaghetti but the water boils over and floods the kitchen just as your date arrives.","WORST move: Pretend nothing happened while standing ankle-deep in starchy water, insisting 'this is how Italians do it' until your date thinks you're having a breakdown. BEST move: Laugh it off, order takeout, and turn it into a funny story. Exaggerated best case: your date finds it charming. Worst case: you're mopping floors alone while your date texts their friends about the 'spaghetti disaster date.'"
-"Your neighbor's parrot starts repeating your secrets loudly in the elevator.","WORST decision: Try to strangle the parrot while screaming 'SHUT UP' in a crowded elevator, confirming everyone's suspicions that you're the crazy neighbor. BEST decision: Laugh and say 'that bird has quite an imagination!' Exaggerated best case: people think it's hilarious. Worst case: you're known as the person who tried to murder a parrot over gossip."
-"Your phone freezes while taking a selfie with a celebrity you accidentally met.","WORST move: Shake your phone violently while screaming 'WORK, YOU PIECE OF JUNK' at the celebrity, who slowly backs away thinking you're having a mental episode. BEST move: Laugh it off and ask if they'd mind trying again. Exaggerated best case: they find it funny and take multiple photos. Worst case: security escorts you away and you become a cautionary tale about fan behavior."
-"You apply soap all over your body while taking a bath and water runs out.","WORST decision: Use shampoo, conditioner, toothpaste, and eventually dish soap to try washing off, creating a chemical cocktail that makes you smell like a cleaning supply store explosion. BEST decision: Use a wet towel to wipe off what you can and shower later. Exaggerated best case: you're slightly sticky but clean. Worst case: you've created a skin reaction that requires medical attention."
-"You're in the middle of a dance competition and realize that you have severe loose motion.","WORST move: Keep dancing while praying to every deity that your sphincter holds, resulting in a performance that becomes legendary for all the wrong reasons. BEST move: Gracefully exit the stage claiming sudden illness. Exaggerated best case: you're disqualified but dignified. Worst case: you become the reason they install bathrooms backstage at all future competitions."
-"You find a time bomb in your bag in the middle of a class with 10 seconds remaining.","WORST decision: Scream 'BOMB!' and throw it randomly, causing mass panic and potentially hurting someone when it turns out to be your friend's elaborate prank device. BEST decision: Quickly but calmly alert the teacher and evacuate. Exaggerated best case: it's fake and you're a hero. Worst case: you've caused a school evacuation over a kitchen timer, but everyone's safe."
-"You're locked in a room with 20 dogs.","WORST move: Immediately assume they're all rabid wolves and climb the furniture screaming, causing the dogs to think you're playing the world's most dramatic game of tag. BEST move: Stay calm, let them sniff you, and find the exit. Exaggerated best case: you become the dog whisperer. Worst case: you're covered in paw prints and slobber but unharmed."
-"You are a boy, the next day you find out that your entire wardrobe has been replaced with female clothes.","WORST decision: Refuse to leave the house and call in sick to everything for a week, eventually having to explain to your boss why you've become a hermit. BEST decision: Borrow clothes from a friend or buy something basic. Exaggerated best case: you discover a new fashion sense. Worst case: you're late to everything for a day but properly clothed."
-"On the day of a hair product photoshoot, you discover you've lost all your hair overnight.","WORST move: Show up anyway and try to convince everyone that 'bald is the new black' while the photographer questions their life choices. BEST move: Call immediately to reschedule and see a doctor. Exaggerated best case: they love the bold new look. Worst case: you've lost a gig but kept your health as the priority."
-"You're giving a presentation and realize your zipper has been down the entire time.","WORST decision: Draw attention to it by frantically zipping up mid-sentence while announcing 'SORRY, WARDROBE MALFUNCTION' to a room that might not have even noticed. BEST decision: Casually fix it during a natural pause or ignore it until after. Exaggerated best case: nobody noticed. Worst case: you've made a minor issue into the main event."
-"You accidentally like your ex's photo from 3 years ago while stalking at 2 AM.","WORST move: Unlike it, then like it again, then comment 'sorry wrong button' creating a notification storm that screams 'I WAS DEFINITELY STALKING YOU.' BEST move: Leave it liked and pretend it never happened. Exaggerated best case: they don't notice. Worst case: they know you were stalking but you didn't make it worse with panic moves."
-"You're at a funeral and your stomach growls louder than the eulogy.","WORST decision: Try to cover it by making even louder noises, eventually sounding like a dying walrus during the most solemn moment. BEST decision: Press your hand to your stomach and stay still. Exaggerated best case: people think someone else's stomach growled. Worst case: you're remembered as the person whose hunger interrupted the final goodbye."
-"Your fake ID gets rejected at a club and the bouncer is your uncle.","WORST move: Try to convince him that you're actually a time traveler from the future where you're already 21, making the situation infinitely more awkward. BEST move: Laugh it off and ask if he wants to grab coffee instead. Exaggerated best case: he finds it funny and doesn't tell your parents. Worst case: this becomes the story he tells at every family gathering for the next decade."`;
+      // Load the full reasoning dataset CSV file
+      const response = await fetch('/data/reasoning_dataset.csv');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CSV: ${response.status}`);
+      }
 
+      const csvData = await response.text();
       this.scenarios = this.parseCsv(csvData);
+
+      console.log(`✅ Loaded ${this.scenarios.length} scenarios from reasoning_dataset.csv`);
       this.isLoaded = true;
     } catch (error) {
-      console.error('Failed to load scenarios from CSV:', error);
-      // Fallback to a few hardcoded scenarios
+      console.error('Failed to load scenarios from CSV file, using fallback:', error);
+
+      // Fallback to a few hardcoded scenarios if CSV loading fails
       this.scenarios = [
         {
           scenario: "You're cycling in a narrow path and you see a herd of bulls charging at you.",
-          reasoning: "WORST move: Cycling furiously toward them. BEST move: Calmly dismount and step aside."
+          reasoning: "WORST move: Cycling furiously toward them like you're starring in your own action movie - congratulations, you're now a human pancake and the bulls are telling their grandkids about 'that idiot cyclist.' BEST move: Calmly dismount and step aside like a matador with common sense."
+        },
+        {
+          scenario: "You are allergic to laughter and attending a stand up show.",
+          reasoning: "WORST move: Stay in your seat out of politeness and laugh along, resulting in your face swelling up like a balloon animal until you look like the Michelin Man's distant cousin. BEST move: Leave immediately or pop antihistamines like candy."
+        },
+        {
+          scenario: "Your phone freezes while taking a selfie with a celebrity you accidentally met.",
+          reasoning: "WORST move: Shake your phone violently while screaming 'WORK, YOU PIECE OF JUNK' at the celebrity, who slowly backs away thinking you're having a mental episode. BEST move: Laugh it off and ask if they'd mind trying again."
         }
       ];
       this.isLoaded = true;
@@ -58,30 +49,70 @@ class ScenarioService {
   private parseCsv(csvData: string): ScenarioData[] {
     const lines = csvData.split('\n');
     const scenarios: ScenarioData[] = [];
-    
+
     // Skip header row
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      
-      // Simple CSV parsing - handles quoted fields
-      const match = line.match(/^"([^"]+)","(.+)"$/);
-      if (match) {
-        scenarios.push({
-          scenario: match[1],
-          reasoning: match[2]
-        });
+
+      try {
+        // Enhanced CSV parsing - handles quoted fields with escaped quotes
+        const result = this.parseCSVLine(line);
+        if (result && result.length >= 2) {
+          scenarios.push({
+            scenario: result[0],
+            reasoning: result[1]
+          });
+        }
+      } catch (error) {
+        console.warn(`Failed to parse CSV line ${i + 1}:`, line, error);
       }
     }
-    
+
     return scenarios;
+  }
+
+  private parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+
+    while (i < line.length) {
+      const char = line[i];
+
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // Escaped quote
+          current += '"';
+          i += 2;
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+          i++;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // Field separator
+        result.push(current);
+        current = '';
+        i++;
+      } else {
+        current += char;
+        i++;
+      }
+    }
+
+    // Add the last field
+    result.push(current);
+
+    return result;
   }
 
 
 
   async getRandomScenario(): Promise<ScenarioData> {
     await this.loadScenarios();
-    
+
     // If all scenarios have been used, reset
     if (this.usedScenarios.size >= this.scenarios.length) {
       this.usedScenarios.clear();

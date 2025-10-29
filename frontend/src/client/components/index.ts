@@ -9,3 +9,5 @@ export { GameMinimap } from './GameMinimap';
 export { Leaderboard } from './Leaderboard';
 export { GameResults } from './GameResults';
 export { ErrorBoundary } from './ErrorBoundary';
+export { DumStoneReportCard } from './DumStoneReportCard';
+export { RedditAdminPanel } from './RedditAdminPanel';

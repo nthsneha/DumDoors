@@ -173,13 +173,38 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             🏆 Global Leaderboard
           </h2>
-          <button
-            onClick={fetchLeaderboard}
-            className="text-white/60 hover:text-white transition-colors"
-            title="Refresh leaderboard"
-          >
-            🔄
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/reddit/daily-leaderboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                  });
+                  const result = await response.json();
+                  if (result.status === 'success') {
+                    alert('Daily leaderboard posted to Reddit!');
+                  } else {
+                    alert(result.message || 'No games played today');
+                  }
+                } catch (error) {
+                  alert('Failed to post to Reddit');
+                }
+              }}
+              className="text-white/60 hover:text-white transition-colors text-sm bg-orange-500/20 px-2 py-1 rounded"
+              title="Post daily leaderboard to Reddit"
+            >
+              📅 Post to Reddit
+            </button>
+            <button
+              onClick={fetchLeaderboard}
+              className="text-white/60 hover:text-white transition-colors"
+              title="Refresh leaderboard"
+            >
+              🔄
+            </button>
+          </div>
         </div>
 
         {/* Stats Summary */}
@@ -300,7 +325,14 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
                   </div>
                   
                   <div>
-                    <div className="font-semibold text-white">{entry.username}</div>
+                    <div className="font-semibold text-white">
+                      u/{entry.username}
+                      {entry.redditUserId && (
+                        <span className="ml-2 text-xs bg-orange-500/30 text-orange-200 px-2 py-0.5 rounded">
+                          🤖 Reddit
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-white/60 flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-xs ${
                         entry.gameMode === 'multiplayer' 
@@ -314,6 +346,9 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
                           {entry.theme}
                         </span>
                       )}
+                      <span className="text-white/40">
+                        {new Date(entry.completedAt).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
                 </div>

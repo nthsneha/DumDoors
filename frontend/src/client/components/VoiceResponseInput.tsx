@@ -60,8 +60,8 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         speechSupported = !!SpeechRecognition && isSecureContext && hasMediaDevices;
       }
       
-      // Log debug info
-      console.log('Speech Recognition Debug:', {
+      // Enhanced debug info for Reddit environment
+      console.log('🎤 [VOICE DEBUG] Speech Recognition Debug:', {
         isSecureContext,
         hasSpeechRecognition: !!SpeechRecognition,
         hasMediaDevices,
@@ -70,8 +70,23 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         protocol: window.location.protocol,
         hostname: window.location.hostname,
         browser: browserInfo,
-        speechSupported
+        speechSupported,
+        isReddit: window.location.hostname.includes('reddit.com'),
+        isDevvit: window.location.hostname.includes('devvit.com'),
+        windowLocation: window.location.href,
+        permissions: {
+          microphone: 'unknown' // Will be checked later
+        }
       });
+
+      // Check microphone permissions specifically
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'microphone' as PermissionName }).then(result => {
+          console.log('🎤 [VOICE DEBUG] Microphone permission:', result.state);
+        }).catch(err => {
+          console.log('🎤 [VOICE DEBUG] Could not check microphone permission:', err);
+        });
+      }
       
       setSpeechSupported(speechSupported);
     };
@@ -127,20 +142,29 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
   };
 
   const handleVoiceInput = async () => {
+    console.log('🎤 [VOICE DEBUG] Voice input button clicked');
+    
     const browserInfo = getBrowserInfo();
     const SpeechRecognition = (window as any).SpeechRecognition || 
                              (window as any).webkitSpeechRecognition || 
                              (window as any).mozSpeechRecognition ||
                              (window as any).msSpeechRecognition;
 
+    console.log('🎤 [VOICE DEBUG] Browser info:', browserInfo);
+    console.log('🎤 [VOICE DEBUG] SpeechRecognition available:', !!SpeechRecognition);
+    console.log('🎤 [VOICE DEBUG] Current URL:', window.location.href);
+    console.log('🎤 [VOICE DEBUG] Is Reddit:', window.location.hostname.includes('reddit.com'));
+
     // Firefox specific handling
     if (browserInfo === 'Firefox' && !SpeechRecognition) {
+      console.log('🎤 [VOICE DEBUG] Firefox without speech recognition');
       alert('Firefox requires enabling speech recognition:\n\n1. Type "about:config" in the address bar\n2. Search for "media.webspeech.recognition.enable"\n3. Set it to "true"\n4. Restart Firefox\n\nAlternatively, use Chrome or Edge for better speech recognition support.');
       return;
     }
 
     if (!SpeechRecognition) {
       const isSecureContext = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      console.log('🎤 [VOICE DEBUG] No SpeechRecognition, secure context:', isSecureContext);
       if (!isSecureContext) {
         alert('Speech recognition requires HTTPS. Please use a secure connection.');
       } else {
@@ -158,9 +182,16 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
     }
 
     try {
-      // Request microphone permission first
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('🎤 [VOICE DEBUG] Requesting microphone permission...');
       
+      // Request microphone permission first
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('🎤 [VOICE DEBUG] Microphone permission granted, stream:', stream);
+      
+      // Stop the stream since we just needed permission
+      stream.getTracks().forEach(track => track.stop());
+      
+      console.log('🎤 [VOICE DEBUG] Creating SpeechRecognition instance...');
       const recognition = new SpeechRecognition();
       recognitionRef.current = recognition;
       
@@ -176,15 +207,18 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       }
 
       recognition.onstart = () => {
+        console.log('🎤 [VOICE DEBUG] Speech recognition started');
         setIsListening(true);
       };
 
       recognition.onresult = (event: any) => {
+        console.log('🎤 [VOICE DEBUG] Speech recognition result:', event);
         let finalTranscript = '';
         let interimTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
+          console.log('🎤 [VOICE DEBUG] Transcript:', transcript, 'isFinal:', event.results[i].isFinal);
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
           } else {
@@ -193,6 +227,7 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         }
 
         if (finalTranscript) {
+          console.log('🎤 [VOICE DEBUG] Final transcript:', finalTranscript);
           setResponse(prev => {
             const newText = prev + (prev ? ' ' : '') + finalTranscript;
             return newText.slice(0, maxLength);
@@ -201,37 +236,67 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       };
 
       recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('🎤 [VOICE DEBUG] Speech recognition error:', event.error, event);
         setIsListening(false);
         
         // Provide user-friendly error messages
         switch (event.error) {
           case 'not-allowed':
+            console.log('🎤 [VOICE DEBUG] Microphone permission denied');
             alert('Microphone access was denied. Please allow microphone permissions and try again.');
             break;
           case 'no-speech':
-            console.log('No speech detected, stopping...');
+            console.log('🎤 [VOICE DEBUG] No speech detected');
             break;
           case 'audio-capture':
+            console.log('🎤 [VOICE DEBUG] Audio capture failed');
             alert('No microphone found. Please check your microphone connection.');
             break;
           case 'network':
+            console.log('🎤 [VOICE DEBUG] Network error');
             alert('Network error occurred. Please check your internet connection.');
             break;
+          case 'service-not-allowed':
+            console.log('🎤 [VOICE DEBUG] Speech service not allowed');
+            alert('Speech recognition service is not allowed. This may be due to browser restrictions.');
+            break;
           default:
-            console.log('Speech recognition error:', event.error);
+            console.log('🎤 [VOICE DEBUG] Unknown speech recognition error:', event.error);
         }
       };
 
       recognition.onend = () => {
+        console.log('🎤 [VOICE DEBUG] Speech recognition ended');
         setIsListening(false);
       };
 
       recognition.start();
     } catch (error) {
-      console.error('Failed to start speech recognition:', error);
+      console.error('🎤 [VOICE DEBUG] Failed to start speech recognition:', error);
+      console.log('🎤 [VOICE DEBUG] Error details:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
       setIsListening(false);
-      alert('Failed to start voice recognition. Please try again.');
+      
+      if (error instanceof DOMException) {
+        console.log('🎤 [VOICE DEBUG] DOMException details:', {
+          code: error.code,
+          name: error.name,
+          message: error.message
+        });
+        
+        if (error.name === 'NotAllowedError') {
+          alert('Microphone access was denied. Please allow microphone permissions in your browser settings and try again.');
+        } else if (error.name === 'NotFoundError') {
+          alert('No microphone found. Please check your microphone connection.');
+        } else {
+          alert(`Microphone error: ${error.message}`);
+        }
+      } else {
+        alert('Failed to start voice recognition. Please try again.');
+      }
     }
   };
 

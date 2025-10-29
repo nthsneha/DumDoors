@@ -16,30 +16,29 @@ class GeminiService {
 
   private async getConfig(): Promise<AppConfig> {
     if (!this.configPromise) {
-      this.configPromise = fetch('/api/config')
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to fetch app configuration');
-          }
-          return response.json();
-        })
-        .catch(error => {
-          console.error('Failed to fetch config, using defaults:', error);
-          return {
-            environment: 'development',
-            gameMode: 'single',
-            difficultyLevel: 'medium',
-            maxResponseLength: 500,
-          };
-        });
+      this.configPromise = fetch('/api/config').then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch app configuration');
+        }
+        return response.json();
+      }).catch(error => {
+        console.error('Failed to fetch config, using defaults:', error);
+        return {
+          environment: 'development',
+          gameMode: 'single',
+          difficultyLevel: 'medium',
+          maxResponseLength: 500,
+        };
+      });
     }
     return this.configPromise;
   }
 
   async analyzeResponse(scenario: string, userResponse: string, existingReasoning?: string): Promise<ScenarioAnalysis> {
     try {
-      console.log('Making request to server-side Gemini analysis endpoint');
-      
+      console.log('🔍 [DEBUG] Making request to server-side Gemini analysis endpoint');
+      console.log('🔍 [DEBUG] Request data:', { scenario, userResponse, existingReasoning });
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
@@ -52,29 +51,58 @@ class GeminiService {
         }),
       });
 
+      console.log('🔍 [DEBUG] Response status:', response.status);
+      console.log('🔍 [DEBUG] Response ok:', response.ok);
+
       if (!response.ok) {
         let errorMessage = `Server error: ${response.status}`;
         try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (jsonError) {
-          console.warn('Failed to parse error response as JSON:', jsonError);
-          const errorText = await response.text();
-          errorMessage = errorText || errorMessage;
+          const responseText = await response.text();
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.message || errorMessage;
+          } catch (jsonError) {
+            errorMessage = responseText || errorMessage;
+          }
+        } catch (textError) {
+          console.warn('Failed to read error response:', textError);
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
         }
         throw new Error(errorMessage);
       }
 
       const analysis = await response.json();
-      console.log('Server analysis response:', analysis);
+      console.log('🔍 [DEBUG] Server analysis response:', analysis);
+      console.log('🔍 [DEBUG] Analysis type:', typeof analysis);
+      console.log('🔍 [DEBUG] Analysis keys:', Object.keys(analysis));
 
+      // Check if this is a fallback response with debug info
+      if (analysis._debug) {
+        console.log('🚨 [DEBUG] SERVER ERROR DETAILS:', analysis._debug);
+        console.log('🚨 [DEBUG] This is a FALLBACK response, not real AI!');
+        console.log('🚨 [DEBUG] Server error:', analysis._debug.error);
+        console.log('🚨 [DEBUG] Error time:', analysis._debug.timestamp);
+      }
+
+      if (!analysis.score || !analysis.color || !analysis.outcome) {
+        console.log('🚨 [DEBUG] Missing required fields in analysis response');
+        throw new Error('Invalid analysis response structure');
+      }
+
+      if (analysis._debug) {
+        console.log('⚠️ [DEBUG] Using fallback response due to server error');
+      } else {
+        console.log('✅ [DEBUG] Successfully got REAL Gemini response');
+      }
+      
       return {
         score: analysis.score,
         color: analysis.color,
         outcome: analysis.outcome,
       };
     } catch (error) {
-      console.error('Server-side Gemini analysis error:', error);
+      console.error('🚨 [DEBUG] Server-side Gemini analysis error:', error);
+      console.log('🚨 [DEBUG] Falling back to local scoring');
 
       // Enhanced fallback response based on response length and keywords
       const responseLength = userResponse.length;

@@ -9,10 +9,14 @@ import { VoiceResponseInput } from './components/VoiceResponseInput';
 import { useErrorHandler } from './hooks/useErrorHandler';
 import { scenarioService } from './services/scenarioService';
 import { scoringService, type ScoreResponse } from './services/scoringService';
+import { geminiService, type ScenarioAnalysis } from './services/geminiService';
+import { dumStonesService } from './services/dumStonesService';
+import { DumStoneReportCard } from './components/DumStoneReportCard';
+
 import { CONFIG } from './constants/config';
 import type { GameResults as GameResultsType } from '../shared/types/api';
 
-type GameState = 'login' | 'menu' | 'playing' | 'leaderboard' | 'results';
+type GameState = 'login' | 'menu' | 'playing' | 'leaderboard' | 'results' | 'dumstones';
 
 interface GameScenario {
   id: string;
@@ -69,6 +73,9 @@ export const App = () => {
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [showDoorAnimation, setShowDoorAnimation] = useState(false);
   const [showMobileMap, setShowMobileMap] = useState(false);
+  const [gameResponses, setGameResponses] = useState<Array<{ scenario: string, response: string, score: number }>>([]);
+  const [dumStoneReport, setDumStoneReport] = useState<any>(null);
+
 
   // Timer for response phase
   useEffect(() => {
@@ -125,6 +132,32 @@ export const App = () => {
     setGameState('leaderboard');
   };
 
+  const handleViewDumStones = async () => {
+    console.log('🃏 [DEBUG] handleViewDumStones called, gameResponses.length:', gameResponses.length);
+    if (gameResponses.length > 0) {
+      try {
+        console.log('🃏 [DEBUG] Setting loading state and navigating to dumstones page');
+        setDumStoneReport('generating'); // Show loading state
+        setGameState('dumstones');
+
+        console.log('🃏 [DEBUG] Generating report...');
+        const report = await dumStonesService.generateReport(gameResponses);
+        console.log('🃏 [DEBUG] Report generated:', report);
+        setDumStoneReport(report);
+      } catch (error) {
+        console.error('Failed to generate Dum-Stones report:', error);
+        setDumStoneReport('error');
+      }
+    } else {
+      console.log('🃏 [DEBUG] No game responses available');
+    }
+  };
+
+  const handleCloseDumStones = () => {
+    setGameState('menu');
+    setDumStoneReport(null);
+  };
+
   const handleBackToMenu = () => {
     setGameState('menu');
     setGameResults(null);
@@ -134,6 +167,7 @@ export const App = () => {
     setDoorColor('neutral');
     setWaitingForNext(false);
     setShowOutcome(false);
+    setDumStoneReport(null);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
@@ -257,35 +291,80 @@ export const App = () => {
       setIsSubmitting(true);
       clearError();
 
-      // Score the response using scoring service
-      const scoreResponse = scoringService.scoreResponse(currentScenario.content, response);
+      let analysisResult: ScenarioAnalysis | null = null;
+      let scoreResponse: ScoreResponse | null = null;
 
-      // Store the score for tracking
-      setPlayerScores((prev) => [...prev, scoreResponse.total_score]);
+      // Try Gemini first
+      try {
+        console.log('Attempting to use Gemini for response analysis...');
+        analysisResult = await geminiService.analyzeResponse(
+          currentScenario.content,
+          response,
+          currentScenario.reasoning
+        );
+        console.log('Gemini analysis successful:', analysisResult);
 
-      // Store the analysis for display
-      setCurrentAnalysis(scoreResponse);
+        // Convert Gemini analysis to ScoreResponse format
+        scoreResponse = {
+          total_score: analysisResult.score,
+          feedback: analysisResult.outcome,
+          metrics: {
+            creativity: analysisResult.score,
+            feasibility: analysisResult.score,
+            humor: analysisResult.score,
+            originality: analysisResult.score,
+          },
+          path_recommendation: 'normal_path'
+        };
+      } catch (geminiError) {
+        console.warn('Gemini analysis failed, falling back to local scoring:', geminiError);
 
-      // Play sound effect based on score
-      playScoreSound(scoreResponse.total_score);
-
-      // Update door color based on score
-      const score = scoreResponse.total_score;
-      let color: 'red' | 'yellow' | 'green' = 'yellow';
-      if (score >= CONFIG.SCORING.GOOD_THRESHOLD) {
-        color = 'green';
-      } else if (score <= CONFIG.SCORING.POOR_THRESHOLD) {
-        color = 'red';
+        // Fallback to local scoring service
+        scoreResponse = scoringService.scoreResponse(currentScenario.content, response);
+        console.log('Using fallback local scoring:', scoreResponse);
       }
-      setDoorColor(color);
 
-      // Show the outcome
-      setShowOutcome(true);
+      if (scoreResponse) {
+        // Store the score for tracking
+        setPlayerScores((prev) => [...prev, scoreResponse.total_score]);
 
-      // Update game path
-      updateGamePath(scoreResponse);
+        // Store the response for Dum-Stones analysis
+        setGameResponses((prev) => [...prev, {
+          scenario: currentScenario.content,
+          response: response,
+          score: scoreResponse.total_score
+        }]);
 
-      // Response submitted and scored locally
+        // Store the analysis for display
+        setCurrentAnalysis(scoreResponse);
+
+        // Play sound effect based on score
+        playScoreSound(scoreResponse.total_score);
+
+        // Update door color based on score (use Gemini's color if available, otherwise calculate)
+        let color: 'red' | 'yellow' | 'green';
+        if (analysisResult?.color) {
+          color = analysisResult.color;
+        } else {
+          const score = scoreResponse.total_score;
+          if (score >= CONFIG.SCORING.GOOD_THRESHOLD) {
+            color = 'green';
+          } else if (score <= CONFIG.SCORING.POOR_THRESHOLD) {
+            color = 'red';
+          } else {
+            color = 'yellow';
+          }
+        }
+        setDoorColor(color);
+
+        // Show the outcome
+        setShowOutcome(true);
+
+        // Update game path
+        updateGamePath(scoreResponse);
+      }
+
+      // Response submitted and analyzed
 
       // Wait a moment to show the door color change and outcome
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -319,6 +398,43 @@ export const App = () => {
         };
 
         setGameResults(mockResults);
+
+        // Submit to leaderboard
+        try {
+          console.log('📊 Submitting game results to leaderboard...');
+          const response = await fetch('/api/leaderboard/submit', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              gameResults: mockResults,
+            }),
+          });
+
+          if (response.ok) {
+            console.log('✅ Game results submitted to leaderboard successfully');
+
+            // Update user flair if we have a username
+            if (username) {
+              try {
+                await fetch(`/api/reddit/update-flair/${username}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+                console.log('✅ User flair update requested');
+              } catch (flairError) {
+                console.warn('⚠️ Failed to update flair:', flairError);
+              }
+            }
+          } else {
+            console.warn('⚠️ Failed to submit to leaderboard:', await response.text());
+          }
+        } catch (leaderboardError) {
+          console.error('❌ Error submitting to leaderboard:', leaderboardError);
+          // Don't block the game flow if leaderboard submission fails
+        }
+
         setGameState('results');
       } else {
         // Wait for user to click next
@@ -358,7 +474,7 @@ export const App = () => {
           <img
             src="/logo.png"
             alt="DumDoors Logo"
-            className="absolute inset-0 w-full h-full object-cover animate-fade-in"
+            className="absolute inset-0 w-full h-full object-contain md:object-cover animate-fade-in"
             onLoad={() => {
               console.log('Logo loaded successfully');
             }}
@@ -430,9 +546,8 @@ export const App = () => {
               {/* Volume Control */}
               <button
                 onClick={toggleMute}
-                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${
-                  isMuted ? 'ring-2 ring-red-500' : ''
-                }`}
+                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${isMuted ? 'ring-2 ring-red-500' : ''
+                  }`}
                 title={isMuted ? 'Unmute Music' : 'Mute Music'}
               >
                 <div className="text-white text-sm md:text-xl">{isMuted ? '🔇' : '🔊'}</div>
@@ -441,14 +556,13 @@ export const App = () => {
               {/* Sound Effects Control */}
               <button
                 onClick={toggleSoundEffects}
-                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${
-                  isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' : 
-                  isSoundEnabled && !soundsLoaded ? 'ring-2 ring-yellow-500' : 
-                  'ring-2 ring-gray-500'
-                }`}
+                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' :
+                  isSoundEnabled && !soundsLoaded ? 'ring-2 ring-yellow-500' :
+                    'ring-2 ring-gray-500'
+                  }`}
                 title={
                   !soundsLoaded ? 'Sound Effects (Files Missing)' :
-                  isSoundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'
+                    isSoundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'
                 }
               >
                 <div className="text-white text-sm md:text-xl">
@@ -525,6 +639,45 @@ export const App = () => {
                     <span>Leaderboard</span>
                   </div>
                 </button>
+
+                {gameResponses.length > 0 && (
+                  <button
+                    onClick={handleViewDumStones}
+                    className="bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25"
+                  >
+                    <div className="flex items-center justify-center gap-2 md:gap-3">
+                      <span className="text-xl md:text-2xl">🪦</span>
+                      <span>DumStone</span>
+                    </div>
+                  </button>
+                )}
+
+                {/* Test DumStones button - always visible for testing */}
+                <button
+                  onClick={() => {
+                    console.log('🃏 [DEBUG] Test DumStones button clicked');
+                    const testReport = {
+                      title: "The Friend-Dependent Fixer",
+                      personality: "A simple soul who believes most problems can be solved by either fleeing or borrowing.",
+                      roast: "Your decision-making process is a thrilling journey from 'run away!' to 'ask a friend!'",
+                      strengths: ["Self-preservation", "Networking", "Delegation", "Knowing limitations"],
+                      weaknesses: ["Independence", "Confidence", "Decision-making", "Standing ground"],
+                      funnyQuote: "If I can't run from it, I'll just ask a friend if they have a spare solution.",
+                      overallGrade: "D- (Barely Surviving, Thanks to Friends)",
+                      emoji: "😬"
+                    };
+                    setDumStoneReport(testReport);
+                    setGameState('dumstones');
+                  }}
+                  className="bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25"
+                >
+                  <div className="flex items-center justify-center gap-2 md:gap-3">
+                    <span className="text-xl md:text-2xl">🪦</span>
+                    <span>Test DumStone</span>
+                  </div>
+                </button>
+
+
               </div>
             </div>
           </div>
@@ -543,18 +696,17 @@ export const App = () => {
             <div className="fixed inset-0 pointer-events-none z-50">
               {/* Screen-wide pulse effect */}
               <div
-                className={`absolute inset-0 ${
-                  doorColor === 'green'
-                    ? 'bg-green-500/10'
-                    : doorColor === 'yellow'
-                      ? 'bg-yellow-500/10'
-                      : 'bg-red-500/10'
-                } animate-pulse`}
+                className={`absolute inset-0 ${doorColor === 'green'
+                  ? 'bg-green-500/10'
+                  : doorColor === 'yellow'
+                    ? 'bg-yellow-500/10'
+                    : 'bg-red-500/10'
+                  } animate-pulse`}
                 style={{ animationDuration: '1.5s' }}
               />
 
               {/* Score-specific full-screen effects */}
-              {currentAnalysis.score >= 70 && (
+              {currentAnalysis.total_score >= 70 && (
                 <div className="absolute inset-0">
                   {/* Success confetti-like effect */}
                   {[...Array(12)].map((_, i) => (
@@ -585,7 +737,7 @@ export const App = () => {
                 </div>
               )}
 
-              {currentAnalysis.score <= 30 && (
+              {currentAnalysis.total_score <= 30 && (
                 <div className="absolute inset-0">
                   {/* Failure screen shake effect */}
                   <div
@@ -703,15 +855,14 @@ export const App = () => {
 
                 {/* Color Overlay for Door States */}
                 <div
-                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 pointer-events-none ${
-                    doorColor === 'red'
-                      ? 'bg-red-500/10 shadow-red-500/50'
-                      : doorColor === 'yellow'
-                        ? 'bg-yellow-500/10 shadow-yellow-500/50'
-                        : doorColor === 'green'
-                          ? 'bg-green-500/10 shadow-green-500/50'
-                          : 'bg-transparent'
-                  } ${doorColor !== 'neutral' ? 'animate-door-color-change' : 'animate-door-glow'}`}
+                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 pointer-events-none ${doorColor === 'red'
+                    ? 'bg-red-500/10 shadow-red-500/50'
+                    : doorColor === 'yellow'
+                      ? 'bg-yellow-500/10 shadow-yellow-500/50'
+                      : doorColor === 'green'
+                        ? 'bg-green-500/10 shadow-green-500/50'
+                        : 'bg-transparent'
+                    } ${doorColor !== 'neutral' ? 'animate-door-color-change' : 'animate-door-glow'}`}
                 ></div>
 
                 {/* Score-based Pulse Animations */}
@@ -719,42 +870,39 @@ export const App = () => {
                   <div className="absolute inset-0 pointer-events-none">
                     {/* Pulse Ring 1 - Inner */}
                     <div
-                      className={`absolute inset-4 rounded-3xl border-4 ${
-                        doorColor === 'green'
-                          ? 'border-green-400/60 animate-ping'
-                          : doorColor === 'yellow'
-                            ? 'border-yellow-400/60 animate-ping'
-                            : 'border-red-400/60 animate-ping'
-                      }`}
+                      className={`absolute inset-4 rounded-3xl border-4 ${doorColor === 'green'
+                        ? 'border-green-400/60 animate-ping'
+                        : doorColor === 'yellow'
+                          ? 'border-yellow-400/60 animate-ping'
+                          : 'border-red-400/60 animate-ping'
+                        }`}
                       style={{ animationDuration: '2s' }}
                     ></div>
-                    
+
                     {/* Pulse Ring 2 - Middle */}
                     <div
-                      className={`absolute inset-2 rounded-3xl border-2 ${
-                        doorColor === 'green'
-                          ? 'border-green-300/40 animate-ping'
-                          : doorColor === 'yellow'
-                            ? 'border-yellow-300/40 animate-ping'
-                            : 'border-red-300/40 animate-ping'
-                      }`}
+                      className={`absolute inset-2 rounded-3xl border-2 ${doorColor === 'green'
+                        ? 'border-green-300/40 animate-ping'
+                        : doorColor === 'yellow'
+                          ? 'border-yellow-300/40 animate-ping'
+                          : 'border-red-300/40 animate-ping'
+                        }`}
                       style={{ animationDuration: '2.5s', animationDelay: '0.3s' }}
                     ></div>
-                    
+
                     {/* Pulse Ring 3 - Outer */}
                     <div
-                      className={`absolute -inset-2 rounded-3xl border ${
-                        doorColor === 'green'
-                          ? 'border-green-200/30 animate-ping'
-                          : doorColor === 'yellow'
-                            ? 'border-yellow-200/30 animate-ping'
-                            : 'border-red-200/30 animate-ping'
-                      }`}
+                      className={`absolute -inset-2 rounded-3xl border ${doorColor === 'green'
+                        ? 'border-green-200/30 animate-ping'
+                        : doorColor === 'yellow'
+                          ? 'border-yellow-200/30 animate-ping'
+                          : 'border-red-200/30 animate-ping'
+                        }`}
                       style={{ animationDuration: '3s', animationDelay: '0.6s' }}
                     ></div>
 
                     {/* Score-based Particle Effects */}
-                    {currentAnalysis.score >= 70 && (
+                    {currentAnalysis.total_score >= 70 && (
                       <div className="absolute inset-0 pointer-events-none">
                         {/* Success Sparkles */}
                         {[...Array(8)].map((_, i) => (
@@ -772,7 +920,7 @@ export const App = () => {
                       </div>
                     )}
 
-                    {currentAnalysis.score <= 30 && (
+                    {currentAnalysis.total_score <= 30 && (
                       <div className="absolute inset-0 pointer-events-none">
                         {/* Failure Warning Flashes */}
                         <div
@@ -863,13 +1011,12 @@ export const App = () => {
                     <div className="flex-1 min-h-0 flex flex-col">
                       <div className="text-center mb-2 md:mb-4 flex-shrink-0">
                         <div
-                          className={`inline-block px-3 md:px-4 lg:px-6 py-1 md:py-2 lg:py-3 rounded-full text-white font-bold text-base md:text-lg lg:text-xl backdrop-blur-lg border-2 ${
-                            currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
-                              ? 'bg-green-500/80 border-green-300'
-                              : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
-                                ? 'bg-red-500/80 border-red-300'
-                                : 'bg-yellow-500/80 border-yellow-300'
-                          } animate-fade-in`}
+                          className={`inline-block px-3 md:px-4 lg:px-6 py-1 md:py-2 lg:py-3 rounded-full text-white font-bold text-base md:text-lg lg:text-xl backdrop-blur-lg border-2 ${currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
+                            ? 'bg-green-500/80 border-green-300'
+                            : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
+                              ? 'bg-red-500/80 border-red-300'
+                              : 'bg-yellow-500/80 border-yellow-300'
+                            } animate-fade-in`}
                         >
                           Score: {Math.round(currentAnalysis.total_score)}/100{' '}
                           {currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
@@ -927,15 +1074,14 @@ export const App = () => {
 
                 {/* Door Glow Effect */}
                 <div
-                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 ${
-                    doorColor === 'red'
-                      ? 'shadow-[0_0_100px_rgba(239,68,68,0.3)]'
-                      : doorColor === 'yellow'
-                        ? 'shadow-[0_0_100px_rgba(234,179,8,0.3)]'
-                        : doorColor === 'green'
-                          ? 'shadow-[0_0_100px_rgba(34,197,94,0.3)]'
-                          : 'shadow-[0_0_80px_rgba(59,130,246,0.2)]'
-                  } ${doorColor !== 'neutral' ? 'animate-success-pulse' : ''}`}
+                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 ${doorColor === 'red'
+                    ? 'shadow-[0_0_100px_rgba(239,68,68,0.3)]'
+                    : doorColor === 'yellow'
+                      ? 'shadow-[0_0_100px_rgba(234,179,8,0.3)]'
+                      : doorColor === 'green'
+                        ? 'shadow-[0_0_100px_rgba(34,197,94,0.3)]'
+                        : 'shadow-[0_0_80px_rgba(59,130,246,0.2)]'
+                    } ${doorColor !== 'neutral' ? 'animate-success-pulse' : ''}`}
                 ></div>
               </div>
             </div>
@@ -1017,6 +1163,79 @@ export const App = () => {
               onViewLeaderboard={handleViewLeaderboard}
               onBackToLobby={handleBackToMenu}
             />
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+
+
+  // DumStones Page
+  if (gameState === 'dumstones') {
+    console.log('🃏 [DEBUG] Rendering DumStones page, dumStoneReport:', dumStoneReport);
+    return (
+      <ErrorBoundary>
+        <div className="min-h-screen" style={{ backgroundColor: '#000f3e' }}>
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <button
+                onClick={handleCloseDumStones}
+                className="absolute top-4 left-4 bg-white/10 backdrop-blur-lg text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                ← Back to Menu
+              </button>
+
+              <img
+                src="/logo.png"
+                alt="DumDoors Logo"
+                className="w-24 h-24 mx-auto mb-4 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                🪦 Your DumStone
+              </h1>
+              <p className="text-blue-200">AI-powered personality analysis based on your game decisions</p>
+            </div>
+
+            {/* Content */}
+            <div className="flex justify-center">
+              {dumStoneReport === 'generating' && (
+                <div className="bg-white rounded-2xl p-8 text-center max-w-md">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
+                  <div className="text-xl font-bold mb-2 text-gray-800">AI is analyzing your personality...</div>
+                  <div className="text-gray-600">Preparing your DumStone... 🪦</div>
+                </div>
+              )}
+
+              {dumStoneReport === 'error' && (
+                <div className="bg-white rounded-2xl p-8 text-center max-w-md">
+                  <div className="text-6xl mb-4">😵</div>
+                  <div className="text-xl font-bold mb-2 text-gray-800">Oops! Something went wrong</div>
+                  <div className="text-gray-600 mb-6">Our AI got too excited analyzing you and crashed.</div>
+                  <button
+                    onClick={handleViewDumStones}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+
+              {dumStoneReport && dumStoneReport !== 'generating' && dumStoneReport !== 'error' && (
+                <DumStoneReportCard
+                  report={dumStoneReport}
+                  onClose={handleCloseDumStones}
+                  onCopyRoast={() => {
+                    const dumStoneText = `My DumStone: ${dumStoneReport.title} - ${dumStoneReport.roast}`;
+                    navigator.clipboard?.writeText(dumStoneText);
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
       </ErrorBoundary>

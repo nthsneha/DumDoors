@@ -12,9 +12,9 @@ export const createPost = async () => {
       appDisplayName: 'dumdoors',
       backgroundUri: 'default-splash.png',
       buttonLabel: 'Tap to Start',
-      description: 'An exciting interactive experience',
+      description: ' ',
       entryUri: 'index.html',
-      heading: 'Welcome to the Game!',
+      heading: 'Welcome ',
       appIconUri: 'default-icon.png',
     },
     postData: {

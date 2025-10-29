@@ -16,7 +16,7 @@ export const useSoundEffects = () => {
   // Initialize sound effects
   const initializeSounds = useCallback(() => {
     if (soundsRef.current || isInitialized) return;
-    
+
     setIsInitialized(true);
     console.log('🔊 Initializing sound effects...');
 
@@ -72,7 +72,7 @@ export const useSoundEffects = () => {
 
         audio.addEventListener('canplaythrough', onCanPlay);
         audio.addEventListener('error', onError);
-        
+
         // Force load attempt
         audio.load();
       });
@@ -95,17 +95,17 @@ export const useSoundEffects = () => {
     (score: number) => {
       console.log(`🎵 Attempting to play sound for score: ${score}`);
       console.log(`🔊 Sound enabled: ${isSoundEnabled}, Loaded: ${isLoaded}, Sounds ref: ${!!soundsRef.current}`);
-      
+
       if (!isSoundEnabled) {
         console.log('🔇 Sound effects are disabled');
         return;
       }
-      
+
       if (!isLoaded) {
         console.log('⏳ Sound effects not loaded yet');
         return;
       }
-      
+
       if (!soundsRef.current) {
         console.log('❌ Sound effects not initialized');
         return;
@@ -131,10 +131,10 @@ export const useSoundEffects = () => {
 
         // Reset the audio to beginning
         soundToPlay.currentTime = 0;
-        
+
         // Attempt to play
         const playPromise = soundToPlay.play();
-        
+
         if (playPromise !== undefined) {
           playPromise
             .then(() => {
