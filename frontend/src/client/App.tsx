@@ -520,7 +520,70 @@ export const App = () => {
   if (gameState === 'playing') {
     return (
       <ErrorBoundary>
-        <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 flex">
+        <div className="relative min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 flex">
+          {/* Full Screen Pulse Overlay */}
+          {doorColor !== 'neutral' && currentAnalysis && (
+            <div className="fixed inset-0 pointer-events-none z-50">
+              {/* Screen-wide pulse effect */}
+              <div
+                className={`absolute inset-0 ${
+                  doorColor === 'green'
+                    ? 'bg-green-500/10'
+                    : doorColor === 'yellow'
+                      ? 'bg-yellow-500/10'
+                      : 'bg-red-500/10'
+                } animate-pulse`}
+                style={{ animationDuration: '1.5s' }}
+              />
+
+              {/* Score-specific full-screen effects */}
+              {currentAnalysis.score >= 70 && (
+                <div className="absolute inset-0">
+                  {/* Success confetti-like effect */}
+                  {[...Array(12)].map((_, i) => (
+                    <div
+                      key={`success-particle-${i}`}
+                      className="absolute w-3 h-3 bg-green-400 rounded-full animate-ping"
+                      style={{
+                        top: `${10 + (i * 7)}%`,
+                        left: `${5 + (i * 8)}%`,
+                        animationDelay: `${i * 0.15}s`,
+                        animationDuration: '2s'
+                      }}
+                    />
+                  ))}
+                  {/* Additional particles from right side */}
+                  {[...Array(12)].map((_, i) => (
+                    <div
+                      key={`success-particle-right-${i}`}
+                      className="absolute w-2 h-2 bg-green-300 rounded-full animate-ping"
+                      style={{
+                        top: `${15 + (i * 6)}%`,
+                        right: `${5 + (i * 7)}%`,
+                        animationDelay: `${i * 0.2}s`,
+                        animationDuration: '1.8s'
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {currentAnalysis.score <= 30 && (
+                <div className="absolute inset-0">
+                  {/* Failure screen shake effect */}
+                  <div
+                    className="absolute inset-0 bg-red-600/15 animate-pulse"
+                    style={{ animationDuration: '0.5s' }}
+                  />
+                  {/* Warning borders */}
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-red-500/60 animate-pulse" />
+                  <div className="absolute bottom-0 left-0 right-0 h-2 bg-red-500/60 animate-pulse" />
+                  <div className="absolute top-0 bottom-0 left-0 w-2 bg-red-500/60 animate-pulse" />
+                  <div className="absolute top-0 bottom-0 right-0 w-2 bg-red-500/60 animate-pulse" />
+                </div>
+              )}
+            </div>
+          )}
           {/* LEFT SIDE - Map and Info */}
           <div className="w-1/2 p-4 flex flex-col h-screen">
             {/* TOP LEFT - Compact Info Section (20% height) */}
@@ -584,6 +647,80 @@ export const App = () => {
                           : 'bg-transparent'
                   } ${doorColor !== 'neutral' ? 'animate-door-color-change' : 'animate-door-glow'}`}
                 ></div>
+
+                {/* Score-based Pulse Animations */}
+                {doorColor !== 'neutral' && currentAnalysis && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* Pulse Ring 1 - Inner */}
+                    <div
+                      className={`absolute inset-4 rounded-3xl border-4 ${
+                        doorColor === 'green'
+                          ? 'border-green-400/60 animate-ping'
+                          : doorColor === 'yellow'
+                            ? 'border-yellow-400/60 animate-ping'
+                            : 'border-red-400/60 animate-ping'
+                      }`}
+                      style={{ animationDuration: '2s' }}
+                    ></div>
+                    
+                    {/* Pulse Ring 2 - Middle */}
+                    <div
+                      className={`absolute inset-2 rounded-3xl border-2 ${
+                        doorColor === 'green'
+                          ? 'border-green-300/40 animate-ping'
+                          : doorColor === 'yellow'
+                            ? 'border-yellow-300/40 animate-ping'
+                            : 'border-red-300/40 animate-ping'
+                      }`}
+                      style={{ animationDuration: '2.5s', animationDelay: '0.3s' }}
+                    ></div>
+                    
+                    {/* Pulse Ring 3 - Outer */}
+                    <div
+                      className={`absolute -inset-2 rounded-3xl border ${
+                        doorColor === 'green'
+                          ? 'border-green-200/30 animate-ping'
+                          : doorColor === 'yellow'
+                            ? 'border-yellow-200/30 animate-ping'
+                            : 'border-red-200/30 animate-ping'
+                      }`}
+                      style={{ animationDuration: '3s', animationDelay: '0.6s' }}
+                    ></div>
+
+                    {/* Score-based Particle Effects */}
+                    {currentAnalysis.score >= 70 && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        {/* Success Sparkles */}
+                        {[...Array(8)].map((_, i) => (
+                          <div
+                            key={`sparkle-${i}`}
+                            className="absolute w-2 h-2 bg-green-400 rounded-full animate-ping"
+                            style={{
+                              top: `${20 + (i * 10)}%`,
+                              left: `${15 + (i * 8)}%`,
+                              animationDelay: `${i * 0.2}s`,
+                              animationDuration: '1.5s'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {currentAnalysis.score <= 30 && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        {/* Failure Warning Flashes */}
+                        <div
+                          className="absolute inset-0 bg-red-500/20 rounded-3xl animate-pulse"
+                          style={{ animationDuration: '0.8s' }}
+                        />
+                        <div
+                          className="absolute inset-6 bg-red-400/30 rounded-3xl animate-pulse"
+                          style={{ animationDuration: '1.2s', animationDelay: '0.4s' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Door Animation Overlay */}
                 {showDoorAnimation && (

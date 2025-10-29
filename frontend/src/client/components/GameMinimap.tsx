@@ -22,41 +22,49 @@ interface GameMinimapProps {
 
 export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = '' }) => {
   const mapWidth = 400;
-  const mapHeight = 500; // Increased height for vertical expansion
+  const mapHeight = 500;
   
-  // Only show nodes that have been revealed (completed + current + next if current exists)
+  // Static isometric world layout - clean minimal theme
+  const staticWorldElements = [];
+
+  // Static path layout - isometric adventure path that never changes
+  const staticPathPoints = [
+    { x: 80, y: 450, type: 'start' },    // Village at bottom left
+    { x: 140, y: 400, type: 'door' },    // First door
+    { x: 180, y: 350, type: 'door' },    // Second door
+    { x: 220, y: 300, type: 'door' },    // Third door
+    { x: 260, y: 250, type: 'door' },    // Fourth door
+    { x: 300, y: 200, type: 'door' },    // Fifth door
+    { x: 340, y: 150, type: 'door' },    // Sixth door
+    { x: 320, y: 100, type: 'end' },     // Castle at top right
+  ];
+
+  // Get visible nodes based on progress
   const getVisibleNodes = () => {
     const visibleNodes = [];
     
-    for (let i = 0; i < gamePath.nodes.length; i++) {
+    for (let i = 0; i < gamePath.nodes.length && i < staticPathPoints.length; i++) {
       const node = gamePath.nodes[i];
       if (!node) continue;
       
       // Always show start
       if (node.type === 'start') {
-        visibleNodes.push(node);
+        visibleNodes.push({ ...node, ...staticPathPoints[i] });
         continue;
       }
       
-      // Show completed doors
-      if (node.status === 'completed') {
-        visibleNodes.push(node);
+      // Show completed and current doors
+      if (node.status === 'completed' || node.status === 'current') {
+        visibleNodes.push({ ...node, ...staticPathPoints[i] });
         continue;
       }
       
-      // Show current door
-      if (node.status === 'current') {
-        visibleNodes.push(node);
-        continue;
-      }
-      
-      // Only show end if we're at the final door
+      // Show end if we're at the final door
       if (node.type === 'end' && gamePath.currentPosition >= gamePath.totalLength - 1) {
-        visibleNodes.push(node);
+        visibleNodes.push({ ...node, ...staticPathPoints[i] });
         continue;
       }
       
-      // Don't show future doors or end until we're close
       break;
     }
     
@@ -64,197 +72,221 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
   };
 
   const visibleNodes = getVisibleNodes();
-  
-  // Generate isometric path positions for visible nodes
-  const generateIsometricPath = () => {
-    const pathPoints = [];
-    const nodeCount = visibleNodes.length;
+
+  // Path impact indicator
+  const getPathImpactMessage = () => {
+    const lastCompletedNode = gamePath.nodes
+      .filter(n => n.status === 'completed' && n.type === 'door')
+      .pop();
     
-    for (let i = 0; i < nodeCount; i++) {
-      const progress = i / Math.max(1, nodeCount - 1);
-      
-      // Isometric projection: create depth and perspective
-      const baseX = 20 + progress * 60; // Horizontal progression
-      const baseZ = Math.sin(progress * Math.PI * 2) * 20; // Depth variation
-      const baseY = 50 + Math.cos(progress * Math.PI * 1.5) * 15; // Vertical variation
-      
-      // Convert to isometric 2D coordinates
-      const isoX = baseX + baseZ * 0.5; // X affected by depth
-      const isoY = baseY - baseZ * 0.3; // Y affected by depth (isometric angle)
-      
-      // Add some randomness for organic feel
-      const randomX = (Math.random() - 0.5) * 8;
-      const randomY = (Math.random() - 0.5) * 8;
-      
-      pathPoints.push({
-        x: Math.max(10, Math.min(90, isoX + randomX)),
-        y: Math.max(15, Math.min(85, isoY + randomY)),
-        z: baseZ, // Keep depth for layering
-        index: i,
-        node: visibleNodes[i]
-      });
-    }
+    if (!lastCompletedNode?.score) return null;
     
-    return pathPoints;
+    const score = lastCompletedNode.score;
+    if (score >= 80) return { text: "🚀 Path Shortened!", color: "text-green-400" };
+    if (score >= 60) return { text: "✨ Good Progress!", color: "text-green-300" };
+    if (score <= 30) return { text: "🐌 Path Extended", color: "text-red-400" };
+    if (score <= 40) return { text: "⚠️ Slower Route", color: "text-yellow-400" };
+    return { text: "➡️ Normal Path", color: "text-blue-300" };
   };
 
-  const pathPoints = generateIsometricPath();
-  
-  // Draw earth-like terrain features
+  const pathImpact = getPathImpactMessage();
+
+  // Draw static terrain (never moves)
   const drawTerrain = () => {
-    const features: React.ReactElement[] = [];
-    
-    // Static terrain features that look earth-like
-    const terrainFeatures = [
-      // Mountains
-      { type: 'mountain', x: 15, y: 20, size: 40, color: '#6b7280' },
-      { type: 'mountain', x: 75, y: 15, size: 35, color: '#64748b' },
-      { type: 'mountain', x: 85, y: 70, size: 30, color: '#6b7280' },
+    return staticWorldElements.map((element, index) => {
+      const key = `terrain-${index}`;
       
-      // Forests
-      { type: 'forest', x: 25, y: 60, size: 50, color: '#22c55e' },
-      { type: 'forest', x: 60, y: 80, size: 45, color: '#16a34a' },
-      { type: 'forest', x: 10, y: 85, size: 35, color: '#15803d' },
+
       
-      // Lakes/Water
-      { type: 'water', x: 45, y: 25, size: 30, color: '#3b82f6' },
-      { type: 'water', x: 70, y: 45, size: 25, color: '#2563eb' },
+      if (element.type === 'river' || element.type === 'lake') {
+        return (
+          <g key={key}>
+            {/* Water shadow */}
+            <ellipse
+              cx={element.x + 2}
+              cy={element.y + 2}
+              rx={element.size * 0.6}
+              ry={element.size * 0.3}
+              fill="rgba(0,0,0,0.2)"
+            />
+            {/* Water body */}
+            <ellipse
+              cx={element.x}
+              cy={element.y}
+              rx={element.size * 0.6}
+              ry={element.size * 0.3}
+              fill={element.color}
+              opacity="0.7"
+            />
+            {/* Water shimmer */}
+            <ellipse
+              cx={element.x}
+              cy={element.y}
+              rx={element.size * 0.4}
+              ry={element.size * 0.2}
+              fill="rgba(255,255,255,0.3)"
+              className="animate-pulse"
+            />
+          </g>
+        );
+      }
       
-      // Plains/Grasslands
-      { type: 'plains', x: 35, y: 40, size: 60, color: '#84cc16' },
-      { type: 'plains', x: 55, y: 65, size: 55, color: '#65a30d' },
-      { type: 'plains', x: 20, y: 75, size: 40, color: '#84cc16' },
+      if (element.type === 'plains') {
+        return (
+          <g key={key}>
+            {/* Plains shadow */}
+            <ellipse
+              cx={element.x + 2}
+              cy={element.y + 2}
+              rx={element.size * 0.7}
+              ry={element.size * 0.2}
+              fill="rgba(0,0,0,0.1)"
+            />
+            {/* Plains */}
+            <ellipse
+              cx={element.x}
+              cy={element.y}
+              rx={element.size * 0.7}
+              ry={element.size * 0.2}
+              fill={element.color}
+              opacity="0.5"
+            />
+          </g>
+        );
+      }
       
-      // Desert areas
-      { type: 'desert', x: 80, y: 30, size: 35, color: '#f59e0b' },
-      { type: 'desert', x: 90, y: 50, size: 25, color: '#d97706' },
-    ];
-    
-    terrainFeatures.forEach((feature, index) => {
-      const x = (feature.x / 100) * mapWidth;
-      const y = (feature.y / 100) * mapHeight;
-      const size = (feature.size / 100) * Math.min(mapWidth, mapHeight);
+      if (element.type === 'desert') {
+        return (
+          <g key={key}>
+            {/* Desert shadow */}
+            <ellipse
+              cx={element.x + 2}
+              cy={element.y + 2}
+              rx={element.size * 0.6}
+              ry={element.size * 0.2}
+              fill="rgba(0,0,0,0.15)"
+            />
+            {/* Desert */}
+            <ellipse
+              cx={element.x}
+              cy={element.y}
+              rx={element.size * 0.6}
+              ry={element.size * 0.2}
+              fill={element.color}
+              opacity="0.6"
+            />
+            {/* Sand dunes */}
+            <ellipse
+              cx={element.x - element.size * 0.2}
+              cy={element.y}
+              rx={element.size * 0.3}
+              ry={element.size * 0.1}
+              fill="rgba(245, 158, 11, 0.8)"
+            />
+          </g>
+        );
+      }
       
-      features.push(
-        <g key={`terrain-${index}`}>
-          <circle
-            cx={x}
-            cy={y}
-            r={size / 2}
-            fill={feature.color}
-            opacity="0.4"
-            className="transition-all duration-300"
-          />
-          {/* Add texture overlay */}
-          <circle
-            cx={x}
-            cy={y}
-            r={size / 2}
-            fill="url(#terrainTexture)"
-            opacity="0.2"
-          />
-        </g>
-      );
+      return null;
     });
-    
-    return features;
   };
 
-  // Draw the path with isometric depth
-  const drawIsometricPath = () => {
-    if (pathPoints.length < 2) return null;
-    
+  // Draw progressive path (only shows as doors are completed)
+  const drawPath = () => {
     const pathElements = [];
     
-    // Draw path segments
-    for (let i = 0; i < pathPoints.length - 1; i++) {
-      const current = pathPoints[i];
-      const next = pathPoints[i + 1];
+    // Only draw path segments up to the current progress
+    const maxSegments = Math.min(visibleNodes.length - 1, staticPathPoints.length - 1);
+    
+    for (let i = 0; i < maxSegments; i++) {
+      const current = staticPathPoints[i];
+      const next = staticPathPoints[i + 1];
       
-      if (!current || !next) continue;
+      // Only draw if we have completed this segment
+      const currentNode = visibleNodes[i];
+      const nextNode = visibleNodes[i + 1];
       
-      const x1 = (current.x / 100) * mapWidth;
-      const y1 = (current.y / 100) * mapHeight;
-      const x2 = (next.x / 100) * mapWidth;
-      const y2 = (next.y / 100) * mapHeight;
+      if (!currentNode || !nextNode) continue;
       
-      // Path segment with depth effect
-      pathElements.push(
-        <g key={`path-${i}`}>
-          {/* Shadow/depth layer */}
+      // Only show path if current door is completed or if next door is current/completed
+      if (currentNode.status === 'completed' || nextNode.status === 'completed' || nextNode.status === 'current') {
+        // Path shadow
+        pathElements.push(
           <line
-            x1={x1 + 2}
-            y1={y1 + 2}
-            x2={x2 + 2}
-            y2={y2 + 2}
+            key={`path-shadow-${i}`}
+            x1={current.x + 2}
+            y1={current.y + 2}
+            x2={next.x + 2}
+            y2={next.y + 2}
             stroke="rgba(0,0,0,0.3)"
             strokeWidth="8"
             strokeLinecap="round"
           />
-          {/* Main path */}
+        );
+        
+        // Main path
+        pathElements.push(
           <line
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
+            key={`path-${i}`}
+            x1={current.x}
+            y1={current.y}
+            x2={next.x}
+            y2={next.y}
             stroke="url(#pathGradient)"
             strokeWidth="6"
             strokeLinecap="round"
-            className="animate-path-glow"
           />
-          {/* Highlight */}
+        );
+        
+        // Path highlight
+        pathElements.push(
           <line
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
+            key={`path-highlight-${i}`}
+            x1={current.x}
+            y1={current.y}
+            x2={next.x}
+            y2={next.y}
             stroke="rgba(255,255,255,0.4)"
             strokeWidth="2"
             strokeLinecap="round"
           />
-        </g>
-      );
+        );
+      }
     }
     
     return pathElements;
   };
 
-  // Draw isometric nodes with depth
-  const drawIsometricNodes = () => {
-    return pathPoints.map((point) => {
-      const node = point.node;
-      if (!node) return null;
+  // Draw static buildings and doors (never move)
+  const drawNodes = () => {
+    return visibleNodes.map((node, index) => {
+      const point = staticPathPoints[index];
+      if (!point) return null;
       
-      const x = (point.x / 100) * mapWidth;
-      const y = (point.y / 100) * mapHeight;
-      const depth = point.z;
+      const x = point.x;
+      const y = point.y;
       
-      // Shadow offset based on depth
-      const shadowOffset = Math.abs(depth) * 0.1 + 2;
-      
-      // Start node - Village
+      // Start node - Village (static)
       if (node.type === 'start') {
         return (
-          <g key={node.id} className="animate-float">
-            {/* Shadow */}
+          <g key={node.id}>
+            {/* Building shadow */}
             <ellipse
-              cx={x + shadowOffset}
-              cy={y + shadowOffset + 15}
+              cx={x + 3}
+              cy={y + 18}
               rx="20"
               ry="8"
               fill="rgba(0,0,0,0.3)"
             />
-            {/* Base platform */}
+            {/* Building base */}
             <ellipse
               cx={x}
               cy={y + 12}
               rx="18"
               ry="6"
               fill="url(#platformGradient)"
-              stroke="rgba(255,255,255,0.3)"
-              strokeWidth="1"
             />
-            {/* Building structure */}
+            {/* Building walls */}
             <rect
               x={x - 12}
               y={y - 8}
@@ -281,90 +313,87 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
               fill="#8b4513"
               rx="3"
             />
-            <text
-              x={x}
-              y={y - 25}
-              textAnchor="middle"
-              className="text-xs fill-green-300 font-bold animate-pulse"
-              style={{ fontSize: '10px' }}
-            >
-              START
-            </text>
+            {/* Windows */}
+            <rect x={x - 8} y={y - 2} width="4" height="4" fill="#fbbf24" rx="1" />
+            <rect x={x + 4} y={y - 2} width="4" height="4" fill="#fbbf24" rx="1" />
           </g>
         );
       }
       
-      // End node - Trophy/Castle (only show when close)
+      // End node - Castle (static)
       if (node.type === 'end') {
         return (
-          <g key={node.id} className="animate-bounce-slow">
-            {/* Shadow */}
+          <g key={node.id}>
+            {/* Castle shadow */}
             <ellipse
-              cx={x + shadowOffset}
-              cy={y + shadowOffset + 20}
-              rx="25"
-              ry="10"
+              cx={x + 4}
+              cy={y + 25}
+              rx="30"
+              ry="12"
               fill="rgba(0,0,0,0.4)"
             />
-            {/* Base platform */}
+            {/* Castle base */}
             <ellipse
               cx={x}
-              cy={y + 15}
-              rx="22"
-              ry="8"
+              cy={y + 18}
+              rx="25"
+              ry="10"
               fill="url(#goldPlatformGradient)"
-              stroke="rgba(255,215,0,0.6)"
-              strokeWidth="2"
             />
-            {/* Castle structure */}
+            {/* Main castle */}
             <rect
-              x={x - 15}
+              x={x - 20}
               y={y - 15}
-              width="30"
-              height="30"
+              width="40"
+              height="33"
               fill="url(#castleGradient)"
               stroke="rgba(255,215,0,0.5)"
               strokeWidth="2"
               rx="3"
             />
             {/* Towers */}
-            <rect x={x - 18} y={y - 20} width="8" height="25" fill="url(#towerGradient)" rx="1" />
-            <rect x={x + 10} y={y - 20} width="8" height="25" fill="url(#towerGradient)" rx="1" />
-            {/* Trophy */}
-            <text
-              x={x}
+            <rect x={x - 25} y={y - 25} width="10" height="35" fill="url(#towerGradient)" rx="2" />
+            <rect x={x + 15} y={y - 25} width="10" height="35" fill="url(#towerGradient)" rx="2" />
+            <rect x={x - 5} y={y - 30} width="10" height="25" fill="url(#towerGradient)" rx="2" />
+            
+            {/* Flags */}
+            <polygon points={`${x-20},${y-25} ${x-15},${y-30} ${x-20},${y-35} ${x-25},${y-30}`} fill="#dc2626" />
+            <polygon points={`${x+20},${y-25} ${x+25},${y-30} ${x+20},${y-35} ${x+15},${y-30}`} fill="#dc2626" />
+            
+            {/* Castle gate */}
+            <rect
+              x={x - 6}
               y={y + 5}
-              textAnchor="middle"
-              className="text-2xl font-bold fill-yellow-300"
-              style={{ fontSize: '24px' }}
-            >
-              🏆
-            </text>
-            <text
-              x={x}
-              y={y - 30}
-              textAnchor="middle"
-              className="text-xs fill-yellow-300 font-bold animate-pulse"
-              style={{ fontSize: '10px' }}
-            >
-              VICTORY!
-            </text>
+              width="12"
+              height="15"
+              fill="#4b5563"
+              rx="6"
+            />
+            
+            {/* Victory glow */}
+            <circle
+              cx={x}
+              cy={y}
+              r="35"
+              fill="rgba(255, 215, 0, 0.2)"
+              className="animate-pulse"
+            />
           </g>
         );
       }
       
-      // Current door - Glowing portal
+      // Current door - Glowing portal (static position)
       if (node.status === 'current') {
         return (
           <g key={node.id}>
-            {/* Pulsing energy rings */}
+            {/* Energy rings */}
             <circle cx={x} cy={y} r="25" fill="none" stroke="#3b82f6" strokeWidth="2" opacity="0.3" className="animate-ping" />
             <circle cx={x} cy={y} r="35" fill="none" stroke="#3b82f6" strokeWidth="1" opacity="0.2" className="animate-ping" style={{animationDelay: '0.5s'}} />
             
-            {/* Shadow */}
+            {/* Portal shadow */}
             <ellipse
-              cx={x + shadowOffset}
-              cy={y + shadowOffset + 12}
+              cx={x + 3}
+              cy={y + 15}
               rx="15"
               ry="6"
               fill="rgba(0,0,0,0.4)"
@@ -373,7 +402,7 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
             {/* Portal base */}
             <ellipse
               cx={x}
-              cy={y + 10}
+              cy={y + 12}
               rx="12"
               ry="4"
               fill="url(#portalBaseGradient)"
@@ -412,21 +441,11 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
             >
               🚪
             </text>
-            
-            <text
-              x={x}
-              y={y - 30}
-              textAnchor="middle"
-              className="text-xs fill-blue-300 font-bold animate-bounce"
-              style={{ fontSize: '9px' }}
-            >
-              CURRENT
-            </text>
           </g>
         );
       }
       
-      // Completed doors - Monuments
+      // Completed doors - Stone monuments (static)
       if (node.status === 'completed') {
         const doorColor = node.color === 'green' ? '#22c55e' : 
                           node.color === 'yellow' ? '#eab308' : '#ef4444';
@@ -435,10 +454,10 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
         
         return (
           <g key={node.id}>
-            {/* Shadow */}
+            {/* Monument shadow */}
             <ellipse
-              cx={x + shadowOffset}
-              cy={y + shadowOffset + 10}
+              cx={x + 2}
+              cy={y + 12}
               rx="12"
               ry="5"
               fill="rgba(0,0,0,0.3)"
@@ -447,7 +466,7 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
             {/* Monument base */}
             <ellipse
               cx={x}
-              cy={y + 8}
+              cy={y + 10}
               rx="10"
               ry="3"
               fill="url(#monumentBaseGradient)"
@@ -458,14 +477,14 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
               x={x - 6}
               y={y - 10}
               width="12"
-              height="18"
+              height="20"
               fill="url(#monumentGradient)"
               stroke="rgba(255,255,255,0.3)"
               strokeWidth="1"
               rx="1"
             />
             
-            {/* Glow effect */}
+            {/* Success glow */}
             <circle
               cx={x}
               cy={y}
@@ -474,7 +493,7 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
               className="animate-pulse"
             />
             
-            {/* Door symbol on monument */}
+            {/* Door symbol */}
             <text
               x={x}
               y={y + 2}
@@ -514,54 +533,35 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
     });
   };
 
-  // Path impact indicator
-  const getPathImpactMessage = () => {
-    const lastCompletedNode = gamePath.nodes
-      .filter(n => n.status === 'completed' && n.type === 'door')
-      .pop();
-    
-    if (!lastCompletedNode?.score) return null;
-    
-    const score = lastCompletedNode.score;
-    if (score >= 80) return { text: "🚀 Path Shortened!", color: "text-green-400" };
-    if (score >= 60) return { text: "✨ Good Progress!", color: "text-green-300" };
-    if (score <= 30) return { text: "🐌 Path Extended", color: "text-red-400" };
-    if (score <= 40) return { text: "⚠️ Slower Route", color: "text-yellow-400" };
-    return { text: "➡️ Normal Path", color: "text-blue-300" };
-  };
-
-  const pathImpact = getPathImpactMessage();
-
   return (
-    <div className={`bg-gradient-to-br from-green-900/20 via-blue-900/30 to-brown-900/20 backdrop-blur-lg rounded-xl p-4 border border-green-600/30 h-full ${className}`}>
+    <div className={`bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 rounded-xl p-4 border border-blue-800 h-full max-h-[800px] flex flex-col ${className}`}>
       <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-lg">
-        🌍 <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">World Map</span>
+        🗺️ <span className="text-blue-200">Adventure Map</span>
       </h3>
       
-      {/* Earth-like SVG Map */}
-      <div className="relative bg-gradient-to-br from-green-950/40 via-blue-950/30 to-amber-950/20 rounded-lg p-4 mb-4 border border-green-500/20 overflow-hidden flex-1">
-        {/* Earth-like background pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0 bg-gradient-to-br from-green-800/30 via-blue-800/20 to-amber-800/30"></div>
-          {/* Cloud-like patterns */}
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute bg-white/10 rounded-full"
-              style={{
-                left: `${Math.random() * 90}%`,
-                top: `${Math.random() * 90}%`,
-                width: `${20 + Math.random() * 40}px`,
-                height: `${10 + Math.random() * 20}px`,
-                animationDelay: `${Math.random() * 10}s`,
-              }}
-            />
-          ))}
+      {/* Isometric Fantasy Map */}
+      <div className="relative bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 rounded-lg p-4 mb-4 border border-blue-800 overflow-hidden flex-1 max-h-[650px]">
+        {/* World Map Background */}
+        <div className="absolute inset-0 rounded-lg overflow-hidden">
+          <img
+            src="/worldmap.jpg"
+            alt="World Map"
+            className="w-full h-full object-cover"
+            onLoad={() => console.log('World map loaded successfully')}
+            onError={(e) => {
+              console.log('World map image failed to load, using fallback');
+              e.currentTarget.style.display = 'none';
+            }}
+          />
         </div>
         
-        <svg width={mapWidth} height={mapHeight} className="w-full h-auto relative z-10">
+        <svg 
+          viewBox={`0 0 ${mapWidth} ${mapHeight}`} 
+          className="w-full h-full max-h-[600px] relative z-10" 
+          preserveAspectRatio="xMidYMid meet"
+        >
           <defs>
-            {/* Enhanced gradients for isometric elements */}
+            {/* Gradients for isometric elements */}
             <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#06b6d4" />
               <stop offset="50%" stopColor="#3b82f6" />
@@ -622,34 +622,19 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
               <stop offset="0%" stopColor="#374151" />
               <stop offset="100%" stopColor="#1f2937" />
             </linearGradient>
-            
-            {/* Earth-like texture pattern */}
-            <pattern id="terrainTexture" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <circle cx="5" cy="5" r="1" fill="rgba(255,255,255,0.1)" />
-              <circle cx="15" cy="10" r="0.5" fill="rgba(255,255,255,0.05)" />
-              <circle cx="10" cy="15" r="0.8" fill="rgba(255,255,255,0.08)" />
-            </pattern>
-            
-            {/* Earth background gradient */}
-            <radialGradient id="earthBackground" cx="50%" cy="50%" r="70%">
-              <stop offset="0%" stopColor="#22c55e" stopOpacity="0.1" />
-              <stop offset="30%" stopColor="#3b82f6" stopOpacity="0.15" />
-              <stop offset="60%" stopColor="#84cc16" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="#0f172a" stopOpacity="0.3" />
-            </radialGradient>
           </defs>
           
-          {/* Earth background */}
+          {/* Fantasy world background */}
           <rect width="100%" height="100%" fill="url(#earthBackground)" />
           
-          {/* Draw terrain */}
+          {/* Draw static terrain (never moves) */}
           {drawTerrain()}
           
-          {/* Draw path */}
-          {drawIsometricPath()}
+          {/* Draw static path (never moves) */}
+          {drawPath()}
           
-          {/* Draw nodes */}
-          {drawIsometricNodes()}
+          {/* Draw static buildings and doors (never move) */}
+          {drawNodes()}
         </svg>
       </div>
 
@@ -662,11 +647,11 @@ export const GameMinimap: React.FC<GameMinimapProps> = ({ gamePath, className = 
         </div>
       )}
 
-      {/* Stats */}
+      {/* Progress Stats */}
       <div className="flex justify-center">
-        <div className="bg-black/40 backdrop-blur-sm rounded-lg p-4 text-center border border-cyan-500/20">
-          <div className="text-cyan-400 font-bold text-2xl">{gamePath.currentPosition}</div>
-          <div className="text-gray-300 text-sm">Doors Passed</div>
+        <div className="bg-blue-900/50 rounded-lg p-4 text-center border border-blue-700">
+          <div className="text-blue-200 font-bold text-2xl">{gamePath.currentPosition}</div>
+          <div className="text-blue-300 text-sm">Doors Conquered</div>
         </div>
       </div>
     </div>
