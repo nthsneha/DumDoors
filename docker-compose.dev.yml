@@ -4,36 +4,92 @@ version: '3.8'
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 services:
-  # Development databases only (no application services)
+  # Development database configurations
   mongodb:
-    ports:
-      - "27017:27017"
-    volumes:
-      - ./database/mongo-init:/docker-entrypoint-initdb.d
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
       MONGO_INITDB_DATABASE: dumdoors
+    volumes:
+      - ./database/mongo-init:/docker-entrypoint-initdb.d:ro
+    command: mongod --auth --bind_ip_all --logpath /var/log/mongodb/mongod.log --logappend
 
   neo4j:
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - ./database/neo4j-init:/var/lib/neo4j/import
     environment:
       NEO4J_AUTH: neo4j/password
+      NEO4J_dbms_memory_heap_initial__size: 256m
+      NEO4J_dbms_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 256m
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
 
   redis:
-    ports:
-      - "6379:6379"
-    command: redis-server --requirepass password
+    command: redis-server --requirepass password --appendonly yes --save 60 1000
 
-  # Remove application services for development
+  # Development application services with hot reload
   backend:
+    build:
+      target: development
+    environment:
+      - GIN_MODE=debug
+      - LOG_LEVEL=debug
+      - HOT_RELOAD=true
+    volumes:
+      - ./backend:/app:cached
+      - backend_dev_cache:/go/pkg/mod
+    command: ["air", "-c", ".air.toml"]
     profiles:
-      - production
+      - dev-services
 
   ai-service:
+    build:
+      target: development
+    environment:
+      - LOG_LEVEL=debug
+      - RELOAD=true
+    volumes:
+      - ./ai-service:/app:cached
+      - ai_service_dev_cache:/root/.cache/pip
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
     profiles:
-      - production
+      - dev-services
+
+  # Development tools
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: dumdoors-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: password
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - dumdoors-network
+    profiles:
+      - dev-tools
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: dumdoors-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:password
+    ports:
+      - "8082:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - dumdoors-network
+    profiles:
+      - dev-tools
+
+volumes:
+  backend_dev_cache:
+  ai_service_dev_cache:

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "dumdoors",
+  "permissions": {
+    "http": {
+      "enable": true,
+      "domains": [
+        "api.dumdoors.tech",
+        "generativelanguage.googleapis.com"
+      ]
+    }
+  },
+  "settings": {
+    "global": {
+      "geminiApiKey": {
+        "type": "string",
+        "label": "Gemini API Key",
+        "isSecret": true
+      },
+      "environment": {
+        "type": "select",
+        "label": "Environment",
+        "options": [
+          {
+            "label": "Production",
+            "value": "production"
+          },
+          {
+            "label": "Development",
+            "value": "development"
+          }
+        ],
+        "defaultValue": "development"
+      }
+    },
+    "subreddit": {
+      "gameMode": {
+        "type": "select",
+        "label": "Default Game Mode",
+        "options": [
+          {
+            "label": "Single Player",
+            "value": "single"
+          },
+          {
+            "label": "Multiplayer",
+            "value": "multiplayer"
+          }
+        ],
+        "defaultValue": "single"
+      },
+      "difficultyLevel": {
+        "type": "select",
+        "label": "Default Difficulty",
+        "options": [
+          {
+            "label": "Easy",
+            "value": "easy"
+          },
+          {
+            "label": "Medium",
+            "value": "medium"
+          },
+          {
+            "label": "Hard",
+            "value": "hard"
+          }
+        ],
+        "defaultValue": "medium"
+      },
+      "maxResponseLength": {
+        "type": "number",
+        "label": "Max Response Length (characters)",
+        "defaultValue": 500
+      }
+    }
+  },
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "media": {
+    "dir": "assets"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create a new post",
+        "description": "dumdoors",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      }
+    ]
+  },
+  "triggers": {
+    "onAppInstall": "/internal/on-app-install"
+  },
+  "dev": {
+    "subreddit": "dumdoors_dev"
+  }
+}

@@ -13,6 +13,7 @@ type Config struct {
 	Neo4jPass   string
 	RedisURI    string
 	AIServiceURL string
+	Environment string
 }
 
 // Load loads configuration from environment variables
@@ -25,6 +26,7 @@ func Load() *Config {
 		Neo4jPass:    getEnv("NEO4J_PASS", "password"),
 		RedisURI:     getEnv("REDIS_URI", "redis://localhost:6379"),
 		AIServiceURL: getEnv("AI_SERVICE_URL", "http://localhost:8000"),
+		Environment:  getEnv("ENVIRONMENT", "development"),
 	}
 }
 

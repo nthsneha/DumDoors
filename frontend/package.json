@@ -13,7 +13,7 @@
     "deploy": "npm run build && devvit upload",
     "dev": "concurrently -k -p \"[{name}]\" -n \"CLIENT,SERVER,DEVVIT\" -c \"blue,green,magenta\" \"npm run dev:client\" \"npm run dev:server\" \"npm run dev:devvit\"",
     "dev:client": "cd src/client && vite build --watch",
-    "dev:devvit": "devvit playtest",
+    "dev:devvit": "cd .. && devvit playtest",
     "dev:server": "cd src/server && vite build --watch",
     "dev:vite": "cd src/client && vite --port 7474",
     "lint": "eslint ./src",
@@ -21,7 +21,9 @@
     "login": "devvit login",
     "launch": "npm run build && npm run deploy && devvit publish",
     "prettier": "prettier-package-json --write ./package.json && prettier --write .",
-    "type-check": "tsc --build"
+    "type-check": "tsc --build",
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@devvit/web": "0.12.1",
@@ -35,6 +37,9 @@
   "devDependencies": {
     "@eslint/js": "9.23.0",
     "@tailwindcss/vite": "4.1.6",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/express": "5.0.1",
     "@types/react": "19.1.4",
     "@types/react-dom": "19.1.5",
@@ -45,6 +50,7 @@
     "eslint-plugin-react-hooks": "5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
     "globals": "15.15.0",
+    "jsdom": "^27.0.1",
     "prettier": "3.5.3",
     "prettier-package-json": "2.8.0",
     "prettier-plugin-tailwindcss": "0.6.11",

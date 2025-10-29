@@ -89,3 +89,37 @@ type PlayerPath struct {
 	TotalDoors        int       `json:"totalDoors"`
 	CreatedAt         time.Time `json:"createdAt"`
 }
+
+// PlayerRanking represents a player's final ranking in the game
+type PlayerRanking struct {
+	Rank            int     `json:"rank"`
+	PlayerID        string  `json:"playerId"`
+	Username        string  `json:"username"`
+	CompletionTime  *time.Duration `json:"completionTime,omitempty"` // Time to complete, nil if not finished
+	TotalScore      int     `json:"totalScore"`
+	AverageScore    float64 `json:"averageScore"`
+	DoorsCompleted  int     `json:"doorsCompleted"`
+	TotalDoors      int     `json:"totalDoors"`
+	CompletionRate  float64 `json:"completionRate"` // Percentage of doors completed
+	IsWinner        bool    `json:"isWinner"`
+}
+
+// PlayerPerformanceStats represents detailed performance statistics for a player
+type PlayerPerformanceStats struct {
+	PlayerID              string        `json:"playerId"`
+	Username              string        `json:"username"`
+	TotalScore            int           `json:"totalScore"`
+	AverageScore          float64       `json:"averageScore"`
+	HighestScore          int           `json:"highestScore"`
+	LowestScore           int           `json:"lowestScore"`
+	DoorsCompleted        int           `json:"doorsCompleted"`
+	TotalDoors            int           `json:"totalDoors"`
+	CompletionRate        float64       `json:"completionRate"`
+	CompletionTime        *time.Duration `json:"completionTime,omitempty"`
+	AverageResponseTime   time.Duration `json:"averageResponseTime"`
+	CreativityAverage     float64       `json:"creativityAverage"`
+	FeasibilityAverage    float64       `json:"feasibilityAverage"`
+	HumorAverage          float64       `json:"humorAverage"`
+	OriginalityAverage    float64       `json:"originalityAverage"`
+	PathEfficiency        float64       `json:"pathEfficiency"` // How efficiently they navigated (lower doors = better)
+}

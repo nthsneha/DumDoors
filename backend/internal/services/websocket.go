@@ -1,6 +1,7 @@
 package services
 
 import (
+	"dumdoors-backend/internal/models"
 	"fmt"
 	"log"
 	"sync"
@@ -16,6 +17,29 @@ type WebSocketEvent struct {
 	PlayerID  string      `json:"playerId,omitempty"`
 	Data      interface{} `json:"data"`
 	Timestamp time.Time   `json:"timestamp"`
+}
+
+// PlayerProgress represents a player's current progress in the game
+type PlayerProgress struct {
+	PlayerID        string  `json:"playerId"`
+	Username        string  `json:"username"`
+	CurrentPosition int     `json:"currentPosition"`
+	TotalDoors      int     `json:"totalDoors"`
+	TotalScore      int     `json:"totalScore"`
+	AverageScore    float64 `json:"averageScore"`
+	DoorsCompleted  int     `json:"doorsCompleted"`
+	IsActive        bool    `json:"isActive"`
+	LastResponseAt  *time.Time `json:"lastResponseAt,omitempty"`
+}
+
+// SessionProgress represents the overall progress of all players in a session
+type SessionProgress struct {
+	SessionID       string           `json:"sessionId"`
+	Players         []PlayerProgress `json:"players"`
+	CurrentDoorID   string           `json:"currentDoorId,omitempty"`
+	GameStatus      string           `json:"gameStatus"`
+	LeaderPlayerID  string           `json:"leaderPlayerId,omitempty"`
+	UpdatedAt       time.Time        `json:"updatedAt"`
 }
 
 // WebSocketConnection represents a WebSocket connection with metadata
@@ -39,6 +63,13 @@ type WebSocketManager interface {
 	GetActiveConnections(sessionID string) []*WebSocketConnection
 	CleanupInactiveConnections()
 	HandleWebSocketConnection(c *websocket.Conn, sessionID, playerID string)
+	BroadcastProgressUpdate(sessionID string, progress SessionProgress) error
+	BroadcastPlayerPositionUpdate(sessionID, playerID string, position int, totalDoors int) error
+	BroadcastScoreUpdate(sessionID, playerID string, newScore int, totalScore int) error
+	BroadcastLeaderboardUpdate(sessionID string, leaderboard []PlayerProgress) error
+	BroadcastPlayerStatusUpdate(sessionID string, playerProgress PlayerProgress) error
+	BroadcastFinalRankings(sessionID string, rankings []models.PlayerRanking) error
+	BroadcastPerformanceStatistics(sessionID string, stats []models.PlayerPerformanceStats) error
 }
 
 // WebSocketManagerImpl implements the WebSocketManager interface
@@ -403,4 +434,119 @@ func (w *WebSocketManagerImpl) HandleWebSocketConnection(c *websocket.Conn, sess
 			log.Printf("Failed to broadcast message: %v", err)
 		}
 	}
+}
+
+// BroadcastProgressUpdate broadcasts a complete progress update to all players in a session
+func (w *WebSocketManagerImpl) BroadcastProgressUpdate(sessionID string, progress SessionProgress) error {
+	event := WebSocketEvent{
+		Type:      "progress-update",
+		SessionID: sessionID,
+		Data:      progress,
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastPlayerPositionUpdate broadcasts a player's position change to all players in the session
+func (w *WebSocketManagerImpl) BroadcastPlayerPositionUpdate(sessionID, playerID string, position int, totalDoors int) error {
+	event := WebSocketEvent{
+		Type:      "player-position-update",
+		SessionID: sessionID,
+		PlayerID:  playerID,
+		Data: map[string]interface{}{
+			"playerId":        playerID,
+			"currentPosition": position,
+			"totalDoors":      totalDoors,
+			"progressPercent": float64(position) / float64(totalDoors) * 100,
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastScoreUpdate broadcasts a player's score update to all players in the session
+func (w *WebSocketManagerImpl) BroadcastScoreUpdate(sessionID, playerID string, newScore int, totalScore int) error {
+	event := WebSocketEvent{
+		Type:      "player-score-update",
+		SessionID: sessionID,
+		PlayerID:  playerID,
+		Data: map[string]interface{}{
+			"playerId":   playerID,
+			"newScore":   newScore,
+			"totalScore": totalScore,
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastLeaderboardUpdate broadcasts updated leaderboard to all players in the session
+func (w *WebSocketManagerImpl) BroadcastLeaderboardUpdate(sessionID string, leaderboard []PlayerProgress) error {
+	event := WebSocketEvent{
+		Type:      "leaderboard-update",
+		SessionID: sessionID,
+		Data: map[string]interface{}{
+			"leaderboard": leaderboard,
+			"message":     "Leaderboard updated",
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastPlayerStatusUpdate broadcasts a comprehensive player status update
+func (w *WebSocketManagerImpl) BroadcastPlayerStatusUpdate(sessionID string, playerProgress PlayerProgress) error {
+	event := WebSocketEvent{
+		Type:      "player-status-update",
+		SessionID: sessionID,
+		PlayerID:  playerProgress.PlayerID,
+		Data: map[string]interface{}{
+			"playerId":         playerProgress.PlayerID,
+			"username":         playerProgress.Username,
+			"currentPosition":  playerProgress.CurrentPosition,
+			"totalDoors":       playerProgress.TotalDoors,
+			"totalScore":       playerProgress.TotalScore,
+			"averageScore":     playerProgress.AverageScore,
+			"doorsCompleted":   playerProgress.DoorsCompleted,
+			"isActive":         playerProgress.IsActive,
+			"progressPercent":  float64(playerProgress.CurrentPosition) / float64(playerProgress.TotalDoors) * 100,
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastFinalRankings broadcasts the final rankings when the game is completed
+func (w *WebSocketManagerImpl) BroadcastFinalRankings(sessionID string, rankings []models.PlayerRanking) error {
+	event := WebSocketEvent{
+		Type:      "final-rankings",
+		SessionID: sessionID,
+		Data: map[string]interface{}{
+			"rankings": rankings,
+			"message":  "Final rankings calculated",
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
+}
+
+// BroadcastPerformanceStatistics broadcasts detailed performance statistics for all players
+func (w *WebSocketManagerImpl) BroadcastPerformanceStatistics(sessionID string, stats []models.PlayerPerformanceStats) error {
+	event := WebSocketEvent{
+		Type:      "performance-statistics",
+		SessionID: sessionID,
+		Data: map[string]interface{}{
+			"statistics": stats,
+			"message":    "Performance statistics calculated",
+		},
+		Timestamp: time.Now(),
+	}
+	
+	return w.BroadcastToSession(sessionID, event)
 }

@@ -1,0 +1,23 @@
+// Configuration constants
+export const CONFIG = {
+  // Gemini AI API configuration (fallback - should be set via settings)
+  GEMINI_API_KEY: '', // Will be loaded from settings
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
+
+  // Game configuration
+  GAME: {
+    DEFAULT_TIME_LIMIT: 60, // seconds
+    MAX_RESPONSE_LENGTH: 500,
+    DEFAULT_PATH_LENGTH: 10,
+    MIN_PATH_LENGTH: 5,
+  },
+
+  // AI Response configuration
+  AI: {
+    MAX_OUTPUT_TOKENS: 4000,
+    TEMPERATURE: 0.9,
+    TOP_K: 1,
+    TOP_P: 1,
+  }
+} as const;

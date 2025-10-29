@@ -9,13 +9,17 @@ import (
 
 // GameHandler handles game-related HTTP requests
 type GameHandler struct {
-	gameService services.GameService
+	gameService        services.GameService
+	progressService    services.ProgressService
+	leaderboardService services.LeaderboardService
 }
 
 // NewGameHandler creates a new game handler
-func NewGameHandler(gameService services.GameService) *GameHandler {
+func NewGameHandler(gameService services.GameService, progressService services.ProgressService, leaderboardService services.LeaderboardService) *GameHandler {
 	return &GameHandler{
-		gameService: gameService,
+		gameService:        gameService,
+		progressService:    progressService,
+		leaderboardService: leaderboardService,
 	}
 }
 
@@ -274,5 +278,363 @@ func (h *GameHandler) GetNextDoor(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"door":    door,
+	})
+}
+
+// GetSessionProgress retrieves the current progress for all players in a session
+func (h *GameHandler) GetSessionProgress(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Session ID is required",
+			"message": "Session ID must be provided in the URL path",
+		})
+	}
+	
+	if h.progressService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Progress service unavailable",
+			"message": "Progress tracking service is not available",
+		})
+	}
+	
+	progress, err := h.progressService.CalculateSessionProgress(c.Context(), sessionID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get session progress",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"progress": progress,
+	})
+}
+
+// GetPlayerProgress retrieves the current progress for a specific player
+func (h *GameHandler) GetPlayerProgress(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+	playerID := c.Params("playerId")
+	
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Session ID is required",
+			"message": "Session ID must be provided in the URL path",
+		})
+	}
+	
+	if playerID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Player ID is required",
+			"message": "Player ID must be provided in the URL path",
+		})
+	}
+	
+	if h.progressService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Progress service unavailable",
+			"message": "Progress tracking service is not available",
+		})
+	}
+	
+	progress, err := h.progressService.CalculatePlayerProgress(c.Context(), sessionID, playerID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get player progress",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"progress": progress,
+	})
+}
+
+// GetLeaderboard retrieves the leaderboard for a session
+func (h *GameHandler) GetLeaderboard(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Session ID is required",
+			"message": "Session ID must be provided in the URL path",
+		})
+	}
+	
+	if h.progressService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Progress service unavailable",
+			"message": "Progress tracking service is not available",
+		})
+	}
+	
+	leaderboard, err := h.progressService.GetLeaderboard(c.Context(), sessionID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get leaderboard",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":    true,
+		"leaderboard": leaderboard,
+	})
+}
+
+// GetRealTimeProgress retrieves real-time progress with enhanced tracking
+func (h *GameHandler) GetRealTimeProgress(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Session ID is required",
+			"message": "Session ID must be provided in the URL path",
+		})
+	}
+	
+	if h.progressService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Progress service unavailable",
+			"message": "Progress tracking service is not available",
+		})
+	}
+	
+	progress, err := h.progressService.GetRealTimeSessionStatus(c.Context(), sessionID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get real-time progress",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"progress": progress,
+		"realTime": true,
+	})
+}
+
+// BroadcastProgressUpdate manually triggers a progress update broadcast (for testing/admin)
+func (h *GameHandler) BroadcastProgressUpdate(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Session ID is required",
+			"message": "Session ID must be provided in the URL path",
+		})
+	}
+	
+	if h.progressService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Progress service unavailable",
+			"message": "Progress tracking service is not available",
+		})
+	}
+	
+	err := h.progressService.BroadcastProgressUpdates(c.Context(), sessionID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to broadcast progress update",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Progress update broadcasted successfully",
+	})
+}
+
+// Global Leaderboard Endpoints
+
+// GetGlobalLeaderboard retrieves the global leaderboard with all categories
+func (h *GameHandler) GetGlobalLeaderboard(c *fiber.Ctx) error {
+	if h.leaderboardService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Leaderboard service unavailable",
+			"message": "Leaderboard service is not available",
+		})
+	}
+	
+	// Parse query parameters for filtering
+	filter := models.LeaderboardFilter{
+		Limit: c.QueryInt("limit", 10),
+	}
+	
+	if gameMode := c.Query("gameMode"); gameMode != "" {
+		mode := models.GameMode(gameMode)
+		filter.GameMode = &mode
+	}
+	
+	if theme := c.Query("theme"); theme != "" {
+		filter.Theme = &theme
+	}
+	
+	if timeRange := c.Query("timeRange"); timeRange != "" {
+		filter.TimeRange = &timeRange
+	}
+	
+	leaderboard, err := h.leaderboardService.GetGlobalLeaderboard(c.Context(), filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get global leaderboard",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"leaderboard": leaderboard,
+		"filter":      filter,
+	})
+}
+
+// GetLeaderboardStats retrieves aggregated leaderboard statistics
+func (h *GameHandler) GetLeaderboardStats(c *fiber.Ctx) error {
+	if h.leaderboardService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Leaderboard service unavailable",
+			"message": "Leaderboard service is not available",
+		})
+	}
+	
+	stats, err := h.leaderboardService.GetLeaderboardStats(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get leaderboard stats",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"stats":   stats,
+	})
+}
+
+// GetFastestCompletions retrieves the fastest completion times leaderboard
+func (h *GameHandler) GetFastestCompletions(c *fiber.Ctx) error {
+	if h.leaderboardService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Leaderboard service unavailable",
+			"message": "Leaderboard service is not available",
+		})
+	}
+	
+	// Parse query parameters for filtering
+	filter := models.LeaderboardFilter{
+		Limit: c.QueryInt("limit", 10),
+	}
+	
+	if gameMode := c.Query("gameMode"); gameMode != "" {
+		mode := models.GameMode(gameMode)
+		filter.GameMode = &mode
+	}
+	
+	if theme := c.Query("theme"); theme != "" {
+		filter.Theme = &theme
+	}
+	
+	if timeRange := c.Query("timeRange"); timeRange != "" {
+		filter.TimeRange = &timeRange
+	}
+	
+	entries, err := h.leaderboardService.GetFastestCompletions(c.Context(), filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get fastest completions",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"entries": entries,
+		"filter":  filter,
+	})
+}
+
+// GetHighestAverageScores retrieves the highest average scores leaderboard
+func (h *GameHandler) GetHighestAverageScores(c *fiber.Ctx) error {
+	if h.leaderboardService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Leaderboard service unavailable",
+			"message": "Leaderboard service is not available",
+		})
+	}
+	
+	// Parse query parameters for filtering
+	filter := models.LeaderboardFilter{
+		Limit: c.QueryInt("limit", 10),
+	}
+	
+	if gameMode := c.Query("gameMode"); gameMode != "" {
+		mode := models.GameMode(gameMode)
+		filter.GameMode = &mode
+	}
+	
+	if theme := c.Query("theme"); theme != "" {
+		filter.Theme = &theme
+	}
+	
+	if timeRange := c.Query("timeRange"); timeRange != "" {
+		filter.TimeRange = &timeRange
+	}
+	
+	entries, err := h.leaderboardService.GetHighestAverageScores(c.Context(), filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get highest average scores",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success": true,
+		"entries": entries,
+		"filter":  filter,
+	})
+}
+
+// GetPlayerRank retrieves a player's rank in a specific leaderboard category
+func (h *GameHandler) GetPlayerRank(c *fiber.Ctx) error {
+	playerID := c.Params("playerId")
+	category := c.Params("category")
+	
+	if playerID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Player ID is required",
+			"message": "Player ID must be provided in the URL path",
+		})
+	}
+	
+	if category == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Category is required",
+			"message": "Category must be provided in the URL path",
+		})
+	}
+	
+	if h.leaderboardService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Leaderboard service unavailable",
+			"message": "Leaderboard service is not available",
+		})
+	}
+	
+	rank, err := h.leaderboardService.GetPlayerRank(c.Context(), playerID, category)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to get player rank",
+			"message": err.Error(),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"playerId": playerID,
+		"category": category,
+		"rank":     rank,
 	})
 }

@@ -26,21 +26,25 @@ type GameService interface {
 
 // GameServiceImpl implements the GameService interface
 type GameServiceImpl struct {
-	gameSessionRepo repositories.GameSessionRepository
-	doorRepo        repositories.DoorRepository
-	playerPathRepo  repositories.PlayerPathRepository
-	wsManager       WebSocketManager
-	aiClient        AIClient
+	gameSessionRepo    repositories.GameSessionRepository
+	doorRepo           repositories.DoorRepository
+	playerPathRepo     repositories.PlayerPathRepository
+	wsManager          WebSocketManager
+	aiClient           AIClient
+	progressService    ProgressService
+	leaderboardService LeaderboardService
 }
 
 // NewGameService creates a new game service instance
-func NewGameService(gameSessionRepo repositories.GameSessionRepository, doorRepo repositories.DoorRepository, playerPathRepo repositories.PlayerPathRepository, wsManager WebSocketManager, aiClient AIClient) GameService {
+func NewGameService(gameSessionRepo repositories.GameSessionRepository, doorRepo repositories.DoorRepository, playerPathRepo repositories.PlayerPathRepository, wsManager WebSocketManager, aiClient AIClient, progressService ProgressService, leaderboardService LeaderboardService) GameService {
 	return &GameServiceImpl{
-		gameSessionRepo: gameSessionRepo,
-		doorRepo:        doorRepo,
-		playerPathRepo:  playerPathRepo,
-		wsManager:       wsManager,
-		aiClient:        aiClient,
+		gameSessionRepo:    gameSessionRepo,
+		doorRepo:           doorRepo,
+		playerPathRepo:     playerPathRepo,
+		wsManager:          wsManager,
+		aiClient:           aiClient,
+		progressService:    progressService,
+		leaderboardService: leaderboardService,
 	}
 }
 
@@ -573,6 +577,29 @@ func (s *GameServiceImpl) SubmitResponse(ctx context.Context, sessionID, playerI
 				fmt.Printf("Warning: failed to broadcast response submission: %v\n", err)
 			}
 		}()
+		
+		// Broadcast real-time score update using progress service
+		if s.progressService != nil {
+			go func() {
+				if err := s.progressService.BroadcastRealTimeScoreUpdate(ctx, sessionID, playerID, totalScore, session.Players[playerIndex].TotalScore); err != nil {
+					fmt.Printf("Warning: failed to broadcast real-time score update: %v\n", err)
+				}
+			}()
+			
+			// Track player response and update progress
+			go func() {
+				if err := s.progressService.TrackPlayerResponse(ctx, sessionID, playerID, totalScore); err != nil {
+					fmt.Printf("Warning: failed to track player response: %v\n", err)
+				}
+			}()
+		} else {
+			// Fallback to basic score update if progress service not available
+			go func() {
+				if err := s.wsManager.BroadcastScoreUpdate(sessionID, playerID, totalScore, session.Players[playerIndex].TotalScore); err != nil {
+					fmt.Printf("Warning: failed to broadcast score update: %v\n", err)
+				}
+			}()
+		}
 	}
 	
 	// Check if all players have responded to current door
@@ -702,16 +729,34 @@ func (s *GameServiceImpl) processAllResponses(ctx context.Context, sessionID str
 		if err := s.wsManager.BroadcastToSession(sessionID, event); err != nil {
 			fmt.Printf("Warning: failed to broadcast scores update: %v\n", err)
 		}
+		
+		// Broadcast complete progress update after all responses are processed
+		if s.progressService != nil {
+			go func() {
+				if err := s.progressService.BroadcastProgressUpdates(ctx, sessionID); err != nil {
+					fmt.Printf("Warning: failed to broadcast progress updates: %v\n", err)
+				}
+				
+				// Also broadcast updated leaderboard
+				leaderboard, err := s.progressService.GetLeaderboard(ctx, sessionID)
+				if err == nil {
+					if err := s.wsManager.BroadcastLeaderboardUpdate(sessionID, leaderboard); err != nil {
+						fmt.Printf("Warning: failed to broadcast leaderboard update: %v\n", err)
+					}
+				}
+			}()
+		}
 	}
 	
 	// Check if any player has completed their path (won the game)
 	for _, player := range session.Players {
-		playerPath, err := s.playerPathRepo.GetPlayerPath(ctx, player.PlayerID)
+		hasWon, err := s.checkWinCondition(ctx, sessionID, player.PlayerID)
 		if err != nil {
+			fmt.Printf("Warning: failed to check win condition for player %s: %v\n", player.PlayerID, err)
 			continue // Skip on error
 		}
 		
-		if playerPath != nil && playerPath.CurrentPosition >= playerPath.TotalDoors {
+		if hasWon {
 			// Player has won!
 			return s.handleGameCompletion(ctx, sessionID, player.PlayerID)
 		}
@@ -809,32 +854,86 @@ func (s *GameServiceImpl) handleGameCompletion(ctx context.Context, sessionID, w
 		return fmt.Errorf("failed to update session completion: %w", err)
 	}
 	
-	// Find winner's username
+	// Record game completion for all players in the leaderboard
+	if s.leaderboardService != nil {
+		for _, player := range session.Players {
+			// Only record if player has completed at least one door
+			if len(player.Responses) > 0 {
+				if err := s.leaderboardService.RecordGameCompletion(ctx, sessionID, player.PlayerID); err != nil {
+					fmt.Printf("Warning: failed to record leaderboard entry for player %s: %v\n", player.PlayerID, err)
+				}
+			}
+		}
+	}
+	
+	// Calculate final rankings and performance statistics
+	finalRankings, err := s.calculateFinalRankings(ctx, session)
+	if err != nil {
+		fmt.Printf("Warning: failed to calculate final rankings: %v\n", err)
+		finalRankings = []models.PlayerRanking{} // Use empty rankings as fallback
+	}
+	
+	// Calculate performance statistics for all players
+	performanceStats, err := s.calculatePerformanceStatistics(ctx, session)
+	if err != nil {
+		fmt.Printf("Warning: failed to calculate performance statistics: %v\n", err)
+		performanceStats = []models.PlayerPerformanceStats{} // Use empty stats as fallback
+	}
+	
+	// Find winner's username and details
 	winnerUsername := "Unknown"
-	for _, player := range session.Players {
-		if player.PlayerID == winnerPlayerID {
-			winnerUsername = player.Username
+	var winnerRanking *models.PlayerRanking
+	for _, ranking := range finalRankings {
+		if ranking.PlayerID == winnerPlayerID {
+			winnerUsername = ranking.Username
+			winnerRanking = &ranking
 			break
 		}
 	}
 	
-	// Broadcast game completion to all players
+	// If no ranking found, find from session players
+	if winnerRanking == nil {
+		for _, player := range session.Players {
+			if player.PlayerID == winnerPlayerID {
+				winnerUsername = player.Username
+				break
+			}
+		}
+	}
+	
+	// Broadcast game completion with comprehensive results
 	if s.wsManager != nil {
 		event := WebSocketEvent{
 			Type:      "game-completed",
 			SessionID: sessionID,
 			Data: map[string]interface{}{
-				"winnerId":       winnerPlayerID,
-				"winnerUsername": winnerUsername,
-				"message":        fmt.Sprintf("%s has won the game!", winnerUsername),
-				"session":        session,
-				"completedAt":    session.CompletedAt,
+				"winnerId":           winnerPlayerID,
+				"winnerUsername":     winnerUsername,
+				"message":            fmt.Sprintf("%s has won the game!", winnerUsername),
+				"session":            session,
+				"completedAt":        session.CompletedAt,
+				"finalRankings":      finalRankings,
+				"performanceStats":   performanceStats,
+				"gameMode":           session.Mode,
+				"gameDuration":       s.calculateGameDuration(session),
 			},
 			Timestamp: time.Now(),
 		}
 		
 		if err := s.wsManager.BroadcastToSession(sessionID, event); err != nil {
 			fmt.Printf("Warning: failed to broadcast game completion: %v\n", err)
+		}
+		
+		// Also broadcast final leaderboard update
+		if s.progressService != nil {
+			go func() {
+				leaderboard, err := s.progressService.GetLeaderboard(ctx, sessionID)
+				if err == nil {
+					if err := s.wsManager.BroadcastLeaderboardUpdate(sessionID, leaderboard); err != nil {
+						fmt.Printf("Warning: failed to broadcast final leaderboard: %v\n", err)
+					}
+				}
+			}()
 		}
 	}
 	
@@ -898,6 +997,250 @@ func (s *GameServiceImpl) startResponseTimeout(sessionID, doorID string, timeout
 			fmt.Printf("Error processing responses after timeout: %v\n", err)
 		}
 	}()
+}
+
+// calculateFinalRankings calculates the final rankings for all players in the session
+func (s *GameServiceImpl) calculateFinalRankings(ctx context.Context, session *models.GameSession) ([]models.PlayerRanking, error) {
+	var rankings []models.PlayerRanking
+	
+	// Calculate rankings for each player
+	for _, player := range session.Players {
+		// Get player path for completion information
+		playerPath, err := s.playerPathRepo.GetPlayerPath(ctx, player.PlayerID)
+		if err != nil {
+			// Use default values if path not found
+			playerPath = &models.PlayerPath{
+				PlayerID:        player.PlayerID,
+				CurrentPosition: len(player.Responses),
+				TotalDoors:      10, // Default
+			}
+		}
+		
+		// Calculate completion rate
+		completionRate := 0.0
+		if playerPath.TotalDoors > 0 {
+			completionRate = float64(playerPath.CurrentPosition) / float64(playerPath.TotalDoors) * 100
+		}
+		
+		// Calculate average score
+		averageScore := 0.0
+		if len(player.Responses) > 0 {
+			totalScore := 0
+			for _, response := range player.Responses {
+				totalScore += response.AIScore
+			}
+			averageScore = float64(totalScore) / float64(len(player.Responses))
+		}
+		
+		// Calculate completion time (if completed)
+		var completionTime *time.Duration
+		isWinner := playerPath.CurrentPosition >= playerPath.TotalDoors
+		if isWinner && len(player.Responses) > 0 && session.StartedAt != nil {
+			lastResponseTime := player.Responses[len(player.Responses)-1].SubmittedAt
+			duration := lastResponseTime.Sub(*session.StartedAt)
+			completionTime = &duration
+		}
+		
+		ranking := models.PlayerRanking{
+			PlayerID:       player.PlayerID,
+			Username:       player.Username,
+			CompletionTime: completionTime,
+			TotalScore:     player.TotalScore,
+			AverageScore:   averageScore,
+			DoorsCompleted: len(player.Responses),
+			TotalDoors:     playerPath.TotalDoors,
+			CompletionRate: completionRate,
+			IsWinner:       isWinner,
+		}
+		
+		rankings = append(rankings, ranking)
+	}
+	
+	// Sort rankings by completion status, then by completion time, then by score
+	for i := 0; i < len(rankings)-1; i++ {
+		for j := 0; j < len(rankings)-i-1; j++ {
+			shouldSwap := false
+			
+			// Winners first
+			if rankings[j+1].IsWinner && !rankings[j].IsWinner {
+				shouldSwap = true
+			} else if rankings[j].IsWinner == rankings[j+1].IsWinner {
+				// Both winners or both non-winners
+				if rankings[j].IsWinner {
+					// Both are winners - sort by completion time
+					if rankings[j+1].CompletionTime != nil && rankings[j].CompletionTime != nil {
+						if *rankings[j+1].CompletionTime < *rankings[j].CompletionTime {
+							shouldSwap = true
+						}
+					} else if rankings[j+1].CompletionTime != nil && rankings[j].CompletionTime == nil {
+						shouldSwap = true
+					}
+				} else {
+					// Both non-winners - sort by completion rate, then by average score
+					if rankings[j+1].CompletionRate > rankings[j].CompletionRate {
+						shouldSwap = true
+					} else if rankings[j+1].CompletionRate == rankings[j].CompletionRate {
+						if rankings[j+1].AverageScore > rankings[j].AverageScore {
+							shouldSwap = true
+						}
+					}
+				}
+			}
+			
+			if shouldSwap {
+				rankings[j], rankings[j+1] = rankings[j+1], rankings[j]
+			}
+		}
+	}
+	
+	// Assign ranks
+	for i := range rankings {
+		rankings[i].Rank = i + 1
+	}
+	
+	return rankings, nil
+}
+
+// calculatePerformanceStatistics calculates detailed performance statistics for all players
+func (s *GameServiceImpl) calculatePerformanceStatistics(ctx context.Context, session *models.GameSession) ([]models.PlayerPerformanceStats, error) {
+	var stats []models.PlayerPerformanceStats
+	
+	for _, player := range session.Players {
+		// Get player path for completion information
+		playerPath, err := s.playerPathRepo.GetPlayerPath(ctx, player.PlayerID)
+		if err != nil {
+			playerPath = &models.PlayerPath{
+				PlayerID:        player.PlayerID,
+				CurrentPosition: len(player.Responses),
+				TotalDoors:      10, // Default
+			}
+		}
+		
+		// Initialize statistics
+		playerStats := models.PlayerPerformanceStats{
+			PlayerID:       player.PlayerID,
+			Username:       player.Username,
+			TotalScore:     player.TotalScore,
+			DoorsCompleted: len(player.Responses),
+			TotalDoors:     playerPath.TotalDoors,
+		}
+		
+		// Calculate completion rate
+		if playerPath.TotalDoors > 0 {
+			playerStats.CompletionRate = float64(playerPath.CurrentPosition) / float64(playerPath.TotalDoors) * 100
+		}
+		
+		// Calculate completion time if player finished
+		if playerPath.CurrentPosition >= playerPath.TotalDoors && len(player.Responses) > 0 && session.StartedAt != nil {
+			lastResponseTime := player.Responses[len(player.Responses)-1].SubmittedAt
+			duration := lastResponseTime.Sub(*session.StartedAt)
+			playerStats.CompletionTime = &duration
+		}
+		
+		// Calculate path efficiency (lower total doors = better efficiency)
+		if playerPath.TotalDoors > 0 {
+			// Efficiency is inverse of total doors, normalized to 0-100 scale
+			// Assume 5 doors is perfect (100%), 15 doors is poor (33%)
+			minDoors := 5.0
+			maxDoors := 15.0
+			efficiency := (maxDoors - float64(playerPath.TotalDoors)) / (maxDoors - minDoors) * 100
+			if efficiency < 0 {
+				efficiency = 0
+			} else if efficiency > 100 {
+				efficiency = 100
+			}
+			playerStats.PathEfficiency = efficiency
+		}
+		
+		// Calculate response-based statistics
+		if len(player.Responses) > 0 {
+			totalScore := 0
+			totalCreativity := 0
+			totalFeasibility := 0
+			totalHumor := 0
+			totalOriginality := 0
+			totalResponseTime := time.Duration(0)
+			
+			highestScore := player.Responses[0].AIScore
+			lowestScore := player.Responses[0].AIScore
+			
+			var firstResponseTime *time.Time
+			if session.StartedAt != nil {
+				firstResponseTime = session.StartedAt
+			} else {
+				firstResponseTime = &player.Responses[0].SubmittedAt
+			}
+			
+			for i, response := range player.Responses {
+				totalScore += response.AIScore
+				totalCreativity += response.ScoringMetrics.Creativity
+				totalFeasibility += response.ScoringMetrics.Feasibility
+				totalHumor += response.ScoringMetrics.Humor
+				totalOriginality += response.ScoringMetrics.Originality
+				
+				if response.AIScore > highestScore {
+					highestScore = response.AIScore
+				}
+				if response.AIScore < lowestScore {
+					lowestScore = response.AIScore
+				}
+				
+				// Calculate response time (time between doors or from game start)
+				var responseStartTime time.Time
+				if i == 0 {
+					responseStartTime = *firstResponseTime
+				} else {
+					responseStartTime = player.Responses[i-1].SubmittedAt
+				}
+				responseTime := response.SubmittedAt.Sub(responseStartTime)
+				totalResponseTime += responseTime
+			}
+			
+			responseCount := len(player.Responses)
+			playerStats.AverageScore = float64(totalScore) / float64(responseCount)
+			playerStats.HighestScore = highestScore
+			playerStats.LowestScore = lowestScore
+			playerStats.AverageResponseTime = totalResponseTime / time.Duration(responseCount)
+			playerStats.CreativityAverage = float64(totalCreativity) / float64(responseCount)
+			playerStats.FeasibilityAverage = float64(totalFeasibility) / float64(responseCount)
+			playerStats.HumorAverage = float64(totalHumor) / float64(responseCount)
+			playerStats.OriginalityAverage = float64(totalOriginality) / float64(responseCount)
+		}
+		
+		stats = append(stats, playerStats)
+	}
+	
+	return stats, nil
+}
+
+// calculateGameDuration calculates the total duration of the game
+func (s *GameServiceImpl) calculateGameDuration(session *models.GameSession) time.Duration {
+	if session.StartedAt == nil {
+		return 0
+	}
+	
+	endTime := time.Now()
+	if session.CompletedAt != nil {
+		endTime = *session.CompletedAt
+	}
+	
+	return endTime.Sub(*session.StartedAt)
+}
+
+// checkWinCondition checks if a player has met the win condition
+func (s *GameServiceImpl) checkWinCondition(ctx context.Context, sessionID, playerID string) (bool, error) {
+	// Get player's current path
+	playerPath, err := s.playerPathRepo.GetPlayerPath(ctx, playerID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get player path: %w", err)
+	}
+	
+	if playerPath == nil {
+		return false, nil // No path means no win
+	}
+	
+	// Win condition: player has reached or exceeded their total doors
+	return playerPath.CurrentPosition >= playerPath.TotalDoors, nil
 }
 
 // Helper functions

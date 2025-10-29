@@ -21,13 +21,26 @@ export const useCounter = () => {
       try {
         const res = await fetch('/api/init');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: InitResponse = await res.json();
+        const text = await res.text();
+        
+        // Check if response is HTML (404 page) instead of JSON
+        if (text.trim().startsWith('<!')) {
+          throw new Error('API endpoint not available - using fallback');
+        }
+        
+        const data: InitResponse = JSON.parse(text);
         if (data.type !== 'init') throw new Error('Unexpected response');
         setState({ count: data.count, username: data.username, loading: false });
         setPostId(data.postId);
       } catch (err) {
         console.error('Failed to init counter', err);
-        setState((prev) => ({ ...prev, loading: false }));
+        // Fallback for game mode - set default values
+        setState({ 
+          count: 0, 
+          username: 'Player', 
+          loading: false 
+        });
+        setPostId('game-mode');
       }
     };
     void init();
@@ -39,6 +52,16 @@ export const useCounter = () => {
         console.error('No postId – cannot update counter');
         return;
       }
+      
+      // If in game mode (fallback), just update locally
+      if (postId === 'game-mode') {
+        setState((prev) => ({ 
+          ...prev, 
+          count: action === 'increment' ? prev.count + 1 : prev.count - 1 
+        }));
+        return;
+      }
+      
       try {
         const res = await fetch(`/api/${action}`, {
           method: 'POST',
@@ -50,6 +73,11 @@ export const useCounter = () => {
         setState((prev) => ({ ...prev, count: data.count }));
       } catch (err) {
         console.error(`Failed to ${action}`, err);
+        // Fallback to local update
+        setState((prev) => ({ 
+          ...prev, 
+          count: action === 'increment' ? prev.count + 1 : prev.count - 1 
+        }));
       }
     },
     [postId]
