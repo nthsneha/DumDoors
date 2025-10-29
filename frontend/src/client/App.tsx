@@ -6,8 +6,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { GameMinimap } from './components/GameMinimap';
 import { VoiceResponseInput } from './components/VoiceResponseInput';
 import { useErrorHandler } from './hooks/useErrorHandler';
-import { geminiService, type ScenarioAnalysis } from './services/geminiService';
 import { scenarioService } from './services/scenarioService';
+import { scoringService, type ScoreResponse } from './services/scoringService';
 import { CONFIG } from './constants/config';
 import type { GameResults as GameResultsType } from '../shared/types/api';
 
@@ -16,8 +16,8 @@ type GameState = 'login' | 'menu' | 'playing' | 'leaderboard' | 'results';
 interface GameScenario {
   id: string;
   content: string;
+  reasoning: string;
   difficulty: number;
-  reasoning?: string;
 }
 
 interface PathNode {
@@ -52,28 +52,26 @@ export const App = () => {
   const [gamePath, setGamePath] = useState<GamePath>({
     nodes: [
       { id: 'start', position: 0, type: 'start', status: 'completed' },
-      { id: 'end', position: CONFIG.GAME.DEFAULT_PATH_LENGTH, type: 'end', status: 'future' }
+      { id: 'end', position: CONFIG.GAME.DEFAULT_PATH_LENGTH, type: 'end', status: 'future' },
     ],
     totalLength: CONFIG.GAME.DEFAULT_PATH_LENGTH,
-    currentPosition: 0
+    currentPosition: 0,
   });
   const [doorColor, setDoorColor] = useState<'neutral' | 'red' | 'yellow' | 'green'>('neutral');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
   const [gameResults, setGameResults] = useState<GameResultsType | null>(null);
-  const [currentAnalysis, setCurrentAnalysis] = useState<ScenarioAnalysis | null>(null);
+  const [currentAnalysis, setCurrentAnalysis] = useState<ScoreResponse | null>(null);
+  const [playerScores, setPlayerScores] = useState<number[]>([]);
   const [showOutcome, setShowOutcome] = useState(false);
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [showDoorAnimation, setShowDoorAnimation] = useState(false);
-
-
-
 
   // Timer for response phase
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0 && !isSubmitting) {
       const timer = setInterval(() => {
-        setTimeLeft(prev => Math.max(0, prev - 1));
+        setTimeLeft((prev) => Math.max(0, prev - 1));
       }, 1000);
       return () => clearInterval(timer);
     }
@@ -82,20 +80,29 @@ export const App = () => {
   // Initialize first scenario when game starts
   useEffect(() => {
     if (gameState === 'playing' && !currentScenario) {
-      try {
-        const firstScenarioData = scenarioService.getRandomScenario();
-        setCurrentScenario({
-          id: 'scenario_1',
-          content: firstScenarioData.scenario,
-          difficulty: 1,
-          reasoning: firstScenarioData.reasoning
-        });
-        setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
-      } catch (error) {
-        console.error('Failed to load scenario:', error);
-      }
+      initializeGame();
     }
   }, [gameState, currentScenario]);
+
+  const initializeGame = async () => {
+    try {
+      // Get first scenario from CSV
+      const scenarioData = await scenarioService.getRandomScenario();
+
+      const firstScenario: GameScenario = {
+        id: `scenario_${Date.now()}`,
+        content: scenarioData.scenario,
+        reasoning: scenarioData.reasoning,
+        difficulty: 1,
+      };
+
+      setCurrentScenario(firstScenario);
+      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+    } catch (error) {
+      console.error('Failed to initialize game:', error);
+      handleError(error as Error, 'initialize_game');
+    }
+  };
 
   const handleLogin = () => {
     setGameState('menu');
@@ -115,15 +122,18 @@ export const App = () => {
     setGameState('menu');
     setGameResults(null);
     setCurrentScenario(null);
+    setPlayerScores([]);
+    setCurrentAnalysis(null);
     setDoorColor('neutral');
     setWaitingForNext(false);
+    setShowOutcome(false);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
-        { id: 'end', position: CONFIG.GAME.DEFAULT_PATH_LENGTH, type: 'end', status: 'future' }
+        { id: 'end', position: CONFIG.GAME.DEFAULT_PATH_LENGTH, type: 'end', status: 'future' },
       ],
       totalLength: CONFIG.GAME.DEFAULT_PATH_LENGTH,
-      currentPosition: 0
+      currentPosition: 0,
     });
   };
 
@@ -137,16 +147,19 @@ export const App = () => {
     }
   };
 
-  const handleAnimationEnd = () => {
+  const handleAnimationEnd = async () => {
     try {
-      // Load next scenario after animation ends
-      const nextScenarioData = scenarioService.getRandomScenario();
-      setCurrentScenario({
-        id: `scenario_${gamePath.currentPosition + 1}`,
-        content: nextScenarioData.scenario,
-        difficulty: Math.floor(Math.random() * 3) + 1,
-        reasoning: nextScenarioData.reasoning
-      });
+      // Get next scenario from CSV
+      const scenarioData = await scenarioService.getRandomScenario();
+
+      const nextScenario: GameScenario = {
+        id: `scenario_${Date.now()}`,
+        content: scenarioData.scenario,
+        reasoning: scenarioData.reasoning,
+        difficulty: Math.min(3, Math.max(1, Math.floor(Math.random() * 3) + 1)),
+      };
+
+      setCurrentScenario(nextScenario);
       setDoorColor('neutral');
       setCurrentAnalysis(null);
       setShowOutcome(false);
@@ -156,21 +169,44 @@ export const App = () => {
     } catch (error) {
       console.error('Failed to load next scenario:', error);
       setShowDoorAnimation(false);
+      // Fallback: keep current scenario and allow retry
     }
   };
 
-
-
-  const updateGamePath = (analysis: ScenarioAnalysis) => {
-    setGamePath(prevPath => {
+  const updateGamePath = (scoreResponse: ScoreResponse) => {
+    setGamePath((prevPath) => {
       const newPath = { ...prevPath };
+      const score = scoreResponse.total_score;
 
-      // Adjust path length based on performance
-      if (analysis.color === 'green' && newPath.totalLength > CONFIG.GAME.MIN_PATH_LENGTH) {
-        newPath.totalLength -= 1; // Shorter path for good performance
-      } else if (analysis.color === 'red') {
-        newPath.totalLength += 1; // Longer path for poor performance
+      // Dynamic path adjustment based on score
+      let pathAdjustment = 0;
+      let doorColor: 'red' | 'yellow' | 'green' = 'yellow';
+
+      if (score >= CONFIG.SCORING.EXCELLENT_THRESHOLD) {
+        // Excellent performance - skip a door if possible
+        pathAdjustment = -2;
+        doorColor = 'green';
+      } else if (score >= CONFIG.SCORING.GOOD_THRESHOLD) {
+        // Good performance - shorter path
+        pathAdjustment = -1;
+        doorColor = 'green';
+      } else if (score <= CONFIG.SCORING.TERRIBLE_THRESHOLD) {
+        // Terrible performance - add extra doors
+        pathAdjustment = 2;
+        doorColor = 'red';
+      } else if (score <= CONFIG.SCORING.POOR_THRESHOLD) {
+        // Poor performance - longer path
+        pathAdjustment = 1;
+        doorColor = 'red';
       }
+
+      // Apply path adjustment with bounds checking
+      const newTotalLength = Math.max(
+        CONFIG.GAME.MIN_PATH_LENGTH,
+        Math.min(CONFIG.GAME.MAX_PATH_LENGTH, newPath.totalLength + pathAdjustment)
+      );
+
+      newPath.totalLength = newTotalLength;
 
       // Add current door to path
       const currentDoorId = `door_${newPath.currentPosition + 1}`;
@@ -179,8 +215,8 @@ export const App = () => {
         position: newPath.currentPosition + 1,
         type: 'door',
         status: 'completed',
-        score: analysis.score,
-        color: analysis.color
+        score: score,
+        color: doorColor,
       };
 
       // Update nodes
@@ -197,7 +233,7 @@ export const App = () => {
         id: 'end',
         position: newPath.totalLength,
         type: 'end',
-        status: 'future'
+        status: 'future',
       });
 
       newPath.nodes = updatedNodes;
@@ -214,31 +250,40 @@ export const App = () => {
       setIsSubmitting(true);
       clearError();
 
-      // Get AI analysis from Gemini
-      const analysis = await geminiService.analyzeResponse(
-        currentScenario.content,
-        response,
-        currentScenario.reasoning
-      );
+      // Score the response using scoring service
+      const scoreResponse = scoringService.scoreResponse(currentScenario.content, response);
+
+      // Store the score for tracking
+      setPlayerScores((prev) => [...prev, scoreResponse.total_score]);
 
       // Store the analysis for display
-      setCurrentAnalysis(analysis);
+      setCurrentAnalysis(scoreResponse);
 
       // Update door color based on score
-      setDoorColor(analysis.color);
+      const score = scoreResponse.total_score;
+      let color: 'red' | 'yellow' | 'green' = 'yellow';
+      if (score >= CONFIG.SCORING.GOOD_THRESHOLD) {
+        color = 'green';
+      } else if (score <= CONFIG.SCORING.POOR_THRESHOLD) {
+        color = 'red';
+      }
+      setDoorColor(color);
 
       // Show the outcome
       setShowOutcome(true);
 
       // Update game path
-      updateGamePath(analysis);
+      updateGamePath(scoreResponse);
+
+      // Response submitted and scored locally
 
       // Wait a moment to show the door color change and outcome
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Check if game is complete
       if (gamePath.currentPosition >= gamePath.totalLength - 1) {
         // Game completed - show results
+        const averageScore = playerScores.reduce((a, b) => a + b, 0) / playerScores.length;
         const mockResults: GameResultsType = {
           winner: 'player1',
           rankings: [
@@ -246,21 +291,21 @@ export const App = () => {
               playerId: 'player1',
               username: username || 'You',
               position: 1,
-              totalScore: 285,
-              completionTime: '4m 32s'
-            }
+              totalScore: Math.round(averageScore * playerScores.length),
+              completionTime: '4m 32s',
+            },
           ],
           statistics: [
             {
               playerId: 'player1',
-              averageScore: 85.7,
+              averageScore: Math.round(averageScore * 10) / 10,
               doorsCompleted: gamePath.currentPosition,
-              totalTime: '4m 32s'
-            }
+              totalTime: '4m 32s',
+            },
           ],
-          sessionId: 'demo-session',
+          sessionId: `demo-session-${Date.now()}`,
           gameMode: 'single-player',
-          completedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
         };
 
         setGameResults(mockResults);
@@ -269,15 +314,12 @@ export const App = () => {
         // Wait for user to click next
         setWaitingForNext(true);
       }
-
     } catch (error) {
       handleError(error as Error, 'submit_response');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-
 
   // Show error state if there's an unrecoverable error
   if (errorState.hasError && errorState.retryCount >= 3) {
@@ -315,10 +357,10 @@ export const App = () => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           {/* Dark Overlay for Better Button Visibility */}
           <div className="absolute inset-0 bg-black/30"></div>
-          
+
           {/* Overlaid Start Button at Bottom */}
           <div className="relative z-10 min-h-screen flex items-end justify-center pb-16">
             <button
@@ -351,17 +393,17 @@ export const App = () => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           {/* Fallback - Only shows if image fails */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               {/* No fallback text - just let the gradient background show */}
             </div>
           </div>
-          
+
           {/* Dark Overlay for Better Button Visibility */}
           <div className="absolute inset-0 bg-black/30"></div>
-          
+
           {/* TOP LEFT CORNER - Game Title & Version */}
           <div className="absolute top-4 left-4 z-10">
             <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
@@ -376,29 +418,25 @@ export const App = () => {
           <div className="absolute top-4 right-4 z-10">
             <div className="flex gap-3">
               {/* Music Control */}
-              <button 
+              <button
                 onClick={toggleMusic}
                 className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
                   isPlaying ? 'ring-2 ring-green-500' : ''
                 }`}
                 title={isPlaying ? 'Pause Music' : 'Play Music'}
               >
-                <div className="text-white text-xl">
-                  {isPlaying ? '⏸️' : '🎵'}
-                </div>
+                <div className="text-white text-xl">{isPlaying ? '⏸️' : '🎵'}</div>
               </button>
 
               {/* Volume Control */}
-              <button 
+              <button
                 onClick={toggleMute}
                 className={`bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20 hover:bg-black/50 transition-all ${
                   isMuted ? 'ring-2 ring-red-500' : ''
                 }`}
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
-                <div className="text-white text-xl">
-                  {isMuted ? '🔇' : '🔊'}
-                </div>
+                <div className="text-white text-xl">{isMuted ? '🔇' : '🔊'}</div>
               </button>
 
               {/* Settings */}
@@ -412,14 +450,14 @@ export const App = () => {
           <div className="absolute bottom-4 left-4 z-10">
             <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-xl">
-                    {username ? username.charAt(0).toUpperCase() : 'R'}
+                    {username ? username.charAt(0).toUpperCase() : 'P'}
                   </span>
                 </div>
                 <div className="text-white">
-                  <p className="font-semibold">u/{username || 'anonymous'}</p>
-                  <p className="text-sm text-orange-200">Reddit User</p>
+                  <p className="font-semibold">{username || 'Player'}</p>
+                  <p className="text-sm text-blue-200">Level 1</p>
                 </div>
               </div>
             </div>
@@ -433,7 +471,7 @@ export const App = () => {
                 <div className="text-sm text-blue-200 mb-1">🏆 Best: --</div>
                 <div className="flex items-center gap-2 justify-end">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm">Online</span>
+                  <span className="text-sm">Online: 1,337</span>
                 </div>
               </div>
             </div>
@@ -448,7 +486,7 @@ export const App = () => {
                   ✨ CHOOSE YOUR FATE ✨
                 </div>
               </div>
-              
+
               {/* Buttons */}
               <div className="flex flex-col gap-4">
                 <button
@@ -484,25 +522,25 @@ export const App = () => {
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950 flex">
           {/* LEFT SIDE - Map and Info */}
-          <div className="w-1/2 p-4 flex flex-col">
-            {/* TOP LEFT - Very Small Back Button */}
-            <div className="mb-4">
+          <div className="w-1/2 p-4 flex flex-col h-screen">
+            {/* TOP LEFT - Compact Info Section (20% height) */}
+            <div className="mb-4 space-y-3" style={{ height: '20%' }}>
               <button
                 onClick={handleBackToMenu}
                 className="bg-black/40 backdrop-blur-lg text-white px-3 py-2 rounded-lg hover:bg-black/50 transition-colors border border-white/20 text-sm"
               >
                 ← Menu
               </button>
-            </div>
 
-            {/* Game Info - Top */}
-            <div className="mb-4">
-              <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
-                <h3 className="text-white font-semibold mb-3">🎮 Game Info</h3>
-                <div className="space-y-2 text-sm">
+              {/* Game Info - Compact */}
+              <div className="bg-black/40 backdrop-blur-lg rounded-xl p-3 border border-white/20">
+                <h3 className="text-white font-semibold mb-2 text-sm">🎮 Game Info</h3>
+                <div className="space-y-1 text-xs">
                   <div className="flex justify-between text-gray-300">
                     <span>Door:</span>
-                    <span className="text-white">{gamePath.currentPosition + 1}/{gamePath.totalLength}</span>
+                    <span className="text-white">
+                      {gamePath.currentPosition + 1}/{gamePath.totalLength}
+                    </span>
                   </div>
                   <div className="flex justify-between text-gray-300">
                     <span>Time:</span>
@@ -512,13 +550,9 @@ export const App = () => {
               </div>
             </div>
 
-            {/* BOTTOM LEFT - Big Minimap */}
-            <div className="flex-1 flex items-end">
-              <div className="w-full">
-                <div className="bg-black/40 backdrop-blur-lg rounded-xl p-6 border border-white/20">
-                  <GameMinimap gamePath={gamePath} />
-                </div>
-              </div>
+            {/* MAIN - Big Minimap (80% height) */}
+            <div className="flex-1" style={{ height: '80%' }}>
+              <GameMinimap gamePath={gamePath} className="h-full" />
             </div>
           </div>
 
@@ -537,14 +571,19 @@ export const App = () => {
                     e.currentTarget.style.display = 'none';
                   }}
                 />
-                
+
                 {/* Color Overlay for Door States */}
-                <div className={`absolute inset-0 rounded-3xl transition-all duration-1000 pointer-events-none ${
-                  doorColor === 'red' ? 'bg-red-500/10 shadow-red-500/50' :
-                  doorColor === 'yellow' ? 'bg-yellow-500/10 shadow-yellow-500/50' :
-                  doorColor === 'green' ? 'bg-green-500/10 shadow-green-500/50' :
-                  'bg-transparent'
-                } ${doorColor !== 'neutral' ? 'animate-door-color-change' : 'animate-door-glow'}`}></div>
+                <div
+                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 pointer-events-none ${
+                    doorColor === 'red'
+                      ? 'bg-red-500/10 shadow-red-500/50'
+                      : doorColor === 'yellow'
+                        ? 'bg-yellow-500/10 shadow-yellow-500/50'
+                        : doorColor === 'green'
+                          ? 'bg-green-500/10 shadow-green-500/50'
+                          : 'bg-transparent'
+                  } ${doorColor !== 'neutral' ? 'animate-door-color-change' : 'animate-door-glow'}`}
+                ></div>
 
                 {/* Door Animation Overlay */}
                 {showDoorAnimation && (
@@ -553,22 +592,15 @@ export const App = () => {
                       autoPlay
                       muted
                       playsInline
-                      preload="auto"
                       className="w-full h-full object-cover rounded-3xl"
                       onEnded={handleAnimationEnd}
                       onError={(e) => {
-                        console.error('Door animation failed to load:', e);
-                        console.error('Video element:', e.target);
-                        // Try to continue without animation
-                        setTimeout(() => {
-                          handleAnimationEnd();
-                        }, 2000); // Wait 2 seconds then continue
+                        console.log('Door animation failed to load:', e);
+                        setShowDoorAnimation(false);
                       }}
                       onLoadStart={() => console.log('Door animation loading...')}
                       onCanPlay={() => console.log('Door animation can play')}
                       onPlay={() => console.log('Door animation started playing')}
-                      onLoadedData={() => console.log('Door animation data loaded')}
-                      onLoadedMetadata={() => console.log('Door animation metadata loaded')}
                     >
                       <source src={`/dooranimation.mp4?v=${Date.now()}`} type="video/mp4" />
                       <source src={`./dooranimation.mp4?v=${Date.now()}`} type="video/mp4" />
@@ -583,26 +615,37 @@ export const App = () => {
                   {/* Door Status Indicator and Analysis */}
                   {showOutcome && currentAnalysis && (
                     <div className="mb-4 lg:mb-6 text-center">
-                      <div className={`inline-block px-4 lg:px-6 py-2 lg:py-3 rounded-full text-white font-bold text-lg lg:text-xl backdrop-blur-lg border-2 mb-4 ${currentAnalysis.color === 'red' ? 'bg-red-500/80 border-red-300' :
-                        currentAnalysis.color === 'yellow' ? 'bg-yellow-500/80 border-yellow-300' :
-                          currentAnalysis.color === 'green' ? 'bg-green-500/80 border-green-300' : ''
-                        } animate-fade-in`}>
-                        Score: {currentAnalysis.score}/100 {
-                          currentAnalysis.color === 'red' ? '😞' :
-                            currentAnalysis.color === 'yellow' ? '😐' :
-                              currentAnalysis.color === 'green' ? '😊' : ''
-                        }
+                      <div
+                        className={`inline-block px-4 lg:px-6 py-2 lg:py-3 rounded-full text-white font-bold text-lg lg:text-xl backdrop-blur-lg border-2 mb-4 ${
+                          currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
+                            ? 'bg-green-500/80 border-green-300'
+                            : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
+                              ? 'bg-red-500/80 border-red-300'
+                              : 'bg-yellow-500/80 border-yellow-300'
+                        } animate-fade-in`}
+                      >
+                        Score: {Math.round(currentAnalysis.total_score)}/100{' '}
+                        {currentAnalysis.total_score >= CONFIG.SCORING.GOOD_THRESHOLD
+                          ? '😊'
+                          : currentAnalysis.total_score <= CONFIG.SCORING.POOR_THRESHOLD
+                            ? '😞'
+                            : '😐'}
                       </div>
 
-                      {/* Exaggerated Outcome */}
+                      {/* AI Response */}
                       <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 lg:p-6 border border-white/30 mb-4 animate-slide-in-up">
                         <h3 className="text-lg lg:text-xl font-bold text-white mb-3 flex items-center gap-2">
-                          🎭 <span>What Happens Next...</span>
+                          🤖 <span>AI Response</span>
                         </h3>
-                        <p className="text-gray-100 text-base lg:text-lg leading-relaxed mb-4">
-                          {currentAnalysis.outcome}
-                        </p>
-                        
+
+                        {currentAnalysis.feedback && (
+                          <div className="p-4 bg-black/20 rounded-lg">
+                            <div className="text-white text-base lg:text-lg leading-relaxed">
+                              {currentAnalysis.feedback}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Next Button */}
                         {waitingForNext && (
                           <div className="text-center">
@@ -661,18 +704,28 @@ export const App = () => {
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl z-10">
                     <div className="text-center text-white bg-black/70 backdrop-blur-lg rounded-2xl p-6 lg:p-8 border border-white/30 mx-4">
                       <div className="animate-spin rounded-full h-16 lg:h-20 w-16 lg:w-20 border-b-4 border-white mx-auto mb-4 lg:mb-6"></div>
-                      <div className="text-xl lg:text-2xl font-bold mb-2">AI is analyzing your response...</div>
-                      <div className="text-gray-300 text-base lg:text-lg">This may take a moment</div>
+                      <div className="text-xl lg:text-2xl font-bold mb-2">
+                        AI is analyzing your response...
+                      </div>
+                      <div className="text-gray-300 text-base lg:text-lg">
+                        This may take a moment
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {/* Door Glow Effect */}
-                <div className={`absolute inset-0 rounded-3xl transition-all duration-1000 ${doorColor === 'red' ? 'shadow-[0_0_100px_rgba(239,68,68,0.3)]' :
-                  doorColor === 'yellow' ? 'shadow-[0_0_100px_rgba(234,179,8,0.3)]' :
-                    doorColor === 'green' ? 'shadow-[0_0_100px_rgba(34,197,94,0.3)]' :
-                      'shadow-[0_0_80px_rgba(59,130,246,0.2)]'
-                  } ${doorColor !== 'neutral' ? 'animate-success-pulse' : ''}`}></div>
+                <div
+                  className={`absolute inset-0 rounded-3xl transition-all duration-1000 ${
+                    doorColor === 'red'
+                      ? 'shadow-[0_0_100px_rgba(239,68,68,0.3)]'
+                      : doorColor === 'yellow'
+                        ? 'shadow-[0_0_100px_rgba(234,179,8,0.3)]'
+                        : doorColor === 'green'
+                          ? 'shadow-[0_0_100px_rgba(34,197,94,0.3)]'
+                          : 'shadow-[0_0_80px_rgba(59,130,246,0.2)]'
+                  } ${doorColor !== 'neutral' ? 'animate-success-pulse' : ''}`}
+                ></div>
               </div>
             </div>
           </div>
@@ -707,9 +760,7 @@ export const App = () => {
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
                 🏆 Global Leaderboard
               </h1>
-              <p className="text-blue-200">
-                See how you stack up against other players
-              </p>
+              <p className="text-blue-200">See how you stack up against other players</p>
             </div>
 
             {/* Leaderboard Component */}
@@ -733,14 +784,23 @@ export const App = () => {
                 setGameState('playing');
                 setGameResults(null);
                 setCurrentScenario(null);
+                setPlayerScores([]);
+                setCurrentAnalysis(null);
                 setDoorColor('neutral');
+                setShowOutcome(false);
+                setWaitingForNext(false);
                 setGamePath({
                   nodes: [
                     { id: 'start', position: 0, type: 'start', status: 'completed' },
-                    { id: 'end', position: CONFIG.GAME.DEFAULT_PATH_LENGTH, type: 'end', status: 'future' }
+                    {
+                      id: 'end',
+                      position: CONFIG.GAME.DEFAULT_PATH_LENGTH,
+                      type: 'end',
+                      status: 'future',
+                    },
                   ],
                   totalLength: CONFIG.GAME.DEFAULT_PATH_LENGTH,
-                  currentPosition: 0
+                  currentPosition: 0,
                 });
               }}
               onViewLeaderboard={handleViewLeaderboard}

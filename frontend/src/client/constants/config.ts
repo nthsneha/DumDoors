@@ -11,6 +11,16 @@ export const CONFIG = {
     MAX_RESPONSE_LENGTH: 500,
     DEFAULT_PATH_LENGTH: 10,
     MIN_PATH_LENGTH: 5,
+    MAX_PATH_LENGTH: 15,
+    THEMES: ['adventure', 'mystery', 'comedy', 'survival', 'workplace', 'social'],
+  },
+
+  // Scoring thresholds
+  SCORING: {
+    EXCELLENT_THRESHOLD: 80,
+    GOOD_THRESHOLD: 60,
+    POOR_THRESHOLD: 30,
+    TERRIBLE_THRESHOLD: 15,
   },
 
   // AI Response configuration

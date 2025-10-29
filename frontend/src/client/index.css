@@ -151,3 +151,77 @@
 .transition-enhanced {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Funky minimap animations */
+@keyframes dash {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 20; }
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+@keyframes path-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.5)); }
+  50% { filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)); }
+}
+
+.animate-dash {
+  animation: dash 2s linear infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+.animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.animate-path-glow {
+  animation: path-glow 2s ease-in-out infinite;
+}
+
+/* Isometric map animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes monument-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.3)); }
+  50% { filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)); }
+}
+
+@keyframes portal-energy {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.7; }
+  50% { transform: scale(1.1) rotate(180deg); opacity: 1; }
+}
+
+@keyframes crystal-shine {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5) drop-shadow(0 0 10px currentColor); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-monument-glow {
+  animation: monument-glow 2s ease-in-out infinite;
+}
+
+.animate-portal-energy {
+  animation: portal-energy 4s ease-in-out infinite;
+}
+
+.animate-crystal-shine {
+  animation: crystal-shine 2s ease-in-out infinite;
+}
