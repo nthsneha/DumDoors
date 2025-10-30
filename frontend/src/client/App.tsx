@@ -1,5 +1,56 @@
 import { useState, useEffect } from 'react';
 import { useCounter } from './hooks/useCounter';
+
+// Waiting Screen Component with Video Fallback
+const WaitingScreen = () => {
+  const [videoError, setVideoError] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+      <div className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-6 lg:p-8">
+        {!videoError ? (
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full max-w-2xl h-auto object-contain rounded-2xl border-4 border-purple-400/50 shadow-2xl shadow-purple-500/30"
+            onError={(e) => {
+              console.log('Waiting video failed to load:', e);
+              setVideoError(true);
+            }}
+            onLoad={() => {
+              console.log('Waiting video loaded successfully');
+            }}
+          >
+            <source src="/waiting.mp4" type="video/mp4" />
+          </video>
+        ) : (
+          // Fallback content when video fails
+          <div className="w-full max-w-2xl h-96 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl border-4 border-purple-400/50 flex items-center justify-center">
+            <div className="text-center text-white">
+              <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-white mx-auto mb-4"></div>
+              <div className="text-2xl font-bold mb-2">🧠 AI Analyzing...</div>
+              <div className="text-lg opacity-80">Generating your DumStone</div>
+            </div>
+          </div>
+        )}
+
+        {/* Text overlay at bottom */}
+        <div className="absolute bottom-8 left-0 right-0 text-center">
+          <div className="bg-black/80 backdrop-blur-lg rounded-2xl p-4 md:p-6 mx-4 border border-purple-400/30">
+            <div className="text-white text-xl md:text-2xl font-bold mb-2">
+              🪦 Crafting Your DumStone
+            </div>
+            <div className="text-purple-200 text-base md:text-lg">
+              Our AI is analyzing your responses to create a personalized roast...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 import { useBackgroundMusic } from './hooks/useBackgroundMusic';
 import { useSoundEffects } from './hooks/useSoundEffects';
 import { Leaderboard, GameResults } from './components';
@@ -120,11 +171,11 @@ export const App = () => {
   const initializeGame = async () => {
     try {
       console.log('🎮 [GAME] Initializing game, getting first scenario...');
-      
+
       // Set game start time
       setGameStartTime(Date.now());
       setTotalGameTime(0);
-      
+
       // Get first scenario from hardcoded data
       const scenarioData = scenarioService.getRandomScenario();
       console.log('✅ [GAME] Got scenario data:', {
@@ -171,7 +222,7 @@ export const App = () => {
 
   const handleViewDumStones = async () => {
     console.log('🃏 [DEBUG] handleViewDumStones called');
-    
+
     try {
       setDumStoneReport('generating'); // Show loading state
       setGameState('dumstones');
@@ -182,7 +233,7 @@ export const App = () => {
       if (responsesToUse.length === 0) {
         console.log('🃏 [DEBUG] No current game responses, fetching from server...');
         const response = await fetch('/api/user/responses');
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'success' && data.responses) {
@@ -249,7 +300,7 @@ export const App = () => {
   const handleAnimationEnd = async () => {
     try {
       console.log('🚪 [GAME] Loading next scenario after door animation...');
-      
+
       // Get next scenario from hardcoded data
       const scenarioData = scenarioService.getRandomScenario();
       console.log('✅ [GAME] Got next scenario:', scenarioData.scenario.substring(0, 50) + '...');
@@ -383,7 +434,7 @@ export const App = () => {
 
         // Calculate response time for this scenario
         const responseTimeSeconds = scenarioStartTime ? Math.floor((Date.now() - scenarioStartTime) / 1000) : undefined;
-        
+
         // Fallback to local scoring service
         scoreResponse = scoringService.scoreResponse(currentScenario.content, response, responseTimeSeconds);
         console.log('Using fallback local scoring:', scoreResponse, 'Response time:', responseTimeSeconds, 's');
@@ -438,16 +489,16 @@ export const App = () => {
       if (gamePath.currentPosition >= gamePath.totalLength - 1) {
         // Game completed - show results
         const averageScore = playerScores.reduce((a, b) => a + b, 0) / playerScores.length;
-        
+
         // Format total game time
         const formatGameTime = (seconds: number): string => {
           const mins = Math.floor(seconds / 60);
           const secs = seconds % 60;
           return `${mins}m ${secs}s`;
         };
-        
+
         const gameTimeFormatted = formatGameTime(totalGameTime);
-        
+
         const mockResults: GameResultsType = {
           winner: 'player1',
           rankings: [
@@ -490,7 +541,7 @@ export const App = () => {
 
           if (response.ok) {
             console.log('✅ Game results submitted to leaderboard successfully');
-            
+
             // Update hasPlayedBefore state since user just completed a game
             setHasPlayedBefore(true);
 
@@ -723,11 +774,10 @@ export const App = () => {
                 <button
                   onClick={(gameResponses.length > 0 || hasPlayedBefore) ? handleViewDumStones : undefined}
                   disabled={gameResponses.length === 0 && !hasPlayedBefore}
-                  className={`px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg transition-all duration-200 shadow-2xl border-2 ${
-                    (gameResponses.length > 0 || hasPlayedBefore)
+                  className={`px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg transition-all duration-200 shadow-2xl border-2 ${(gameResponses.length > 0 || hasPlayedBefore)
                       ? 'bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25 cursor-pointer'
                       : 'bg-gradient-to-r from-gray-600/50 via-gray-700/50 to-gray-800/50 backdrop-blur-sm text-gray-400 border-gray-500/40 cursor-not-allowed opacity-60'
-                  }`}
+                    }`}
                   title={(gameResponses.length === 0 && !hasPlayedBefore) ? 'Play at least one game to unlock your DumStone' : 'View your DumStone'}
                 >
                   <div className="flex items-center justify-center gap-2 md:gap-3">
@@ -1142,7 +1192,7 @@ export const App = () => {
                         >
                           <source src="/Doru/AnnoyedDoru.mp4" type="video/mp4" />
                         </video>
-                        
+
                         {/* Fallback content if video fails */}
                         <div className="w-full h-full bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl border-4 border-orange-400/50 flex items-center justify-center" style={{ display: 'none' }}>
                           <div className="text-center text-white">
@@ -1160,7 +1210,7 @@ export const App = () => {
                             <div className="text-orange-300 text-base md:text-lg lg:text-xl">
                               AI is thinking... 🤔
                             </div>
-                            
+
                             {/* Loading dots */}
                             <div className="flex justify-center mt-3 space-x-2">
                               <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
@@ -1309,52 +1359,7 @@ export const App = () => {
             {/* Content */}
             <div className="flex justify-center">
               {dumStoneReport === 'generating' && (
-                <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
-                  {/* Full-screen waiting video */}
-                  <div className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-6 lg:p-8">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full max-w-2xl h-auto object-contain rounded-2xl border-4 border-purple-400/50 shadow-2xl shadow-purple-500/30"
-                      onError={(e) => {
-                        console.log('Waiting video failed to load:', e);
-                        // Show fallback content
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    >
-                      <source src="/waiting.mp4" type="video/mp4" />
-                    </video>
-                    
-                    {/* Fallback content if video fails */}
-                    <div className="w-full max-w-2xl h-96 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl border-4 border-purple-400/50 flex items-center justify-center" style={{ display: 'none' }}>
-                      <div className="text-center text-white">
-                        <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-white mx-auto mb-4"></div>
-                        <div className="text-2xl font-bold">Analyzing...</div>
-                      </div>
-                    </div>
-
-                    {/* Text overlay at bottom */}
-                    <div className="absolute bottom-8 left-0 right-0 text-center">
-                      <div className="bg-black/80 backdrop-blur-lg rounded-2xl p-4 md:p-6 mx-4 border border-purple-400/30">
-                        <div className="text-2xl md:text-3xl font-bold text-white mb-2 animate-pulse">
-                          AI is analyzing your personality...
-                        </div>
-                        <div className="text-purple-300 text-lg md:text-xl">
-                          Preparing your DumStone... 🪦
-                        </div>
-                        
-                        {/* Loading dots */}
-                        <div className="flex justify-center mt-3 space-x-2">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <WaitingScreen />
               )}
 
               {dumStoneReport === 'error' && (

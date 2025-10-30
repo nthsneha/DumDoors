@@ -1,4 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+// Fallback Pumpkin Component with Error Handling
+const PumpkinDecoration: React.FC<{ style: React.CSSProperties }> = ({ style }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (imageError) {
+    // Fallback to emoji pumpkin with better styling
+    return (
+      <div 
+        className="absolute w-80 h-80 opacity-40 animate-float flex items-center justify-center"
+        style={style}
+      >
+        <span className="text-9xl drop-shadow-lg" style={{ filter: 'sepia(1) hue-rotate(15deg) saturate(2)' }}>🎃</span>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src="/pumpkin.svg" 
+      alt="" 
+      className="absolute w-80 h-80 opacity-40 animate-float" 
+      style={style}
+      onError={() => {
+        console.log('🎃 Pumpkin SVG failed to load, using emoji fallback');
+        setImageError(true);
+      }}
+      onLoad={() => {
+        console.log('🎃 Pumpkin SVG loaded successfully');
+      }}
+    />
+  );
+};
 
 interface DumStoneReport {
   title: string;
@@ -95,10 +128,10 @@ export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
             <div className="w-16 h-0.5 bg-gray-700 mb-4 shadow-inner"></div>
 
             {/* Dates (Parody) */}
-            <div className="text-engraved text-gray-800 text-xs leading-relaxed mb-4">
+            {/* <div className="text-engraved text-gray-800 text-xs leading-relaxed mb-4">
               <div>Born: Optimistic</div>
               <div>Died: Disappointed</div>
-            </div>
+            </div> */}
 
             {/* Bottom Decoration */}
             <div className="text-2xl animate-float mt-auto">💀</div>
@@ -126,18 +159,8 @@ export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
         */}
 
         {/* Massive Pumpkins Flanking the Tombstone */}
-        <img
-          src="/pumpkin.svg"
-          alt=""
-          className="absolute w-80 h-80 opacity-40 animate-float"
-          style={{ top: '45%', left: '-70%' }}
-        />
-        <img
-          src="/pumpkin.svg"
-          alt=""
-          className="absolute w-80 h-80 opacity-40 animate-float"
-          style={{ top: '45%', left: '105%' }}
-        />
+        <PumpkinDecoration style={{ top: '45%', left: '-70%' }} />
+        <PumpkinDecoration style={{ top: '45%', left: '105%' }} />
       </div>
     </div>
   );
