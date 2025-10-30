@@ -129,7 +129,56 @@ export const App = () => {
   const [gameResponses, setGameResponses] = useState<Array<{ scenario: string, response: string, score: number }>>([]);
   const [dumStoneReport, setDumStoneReport] = useState<any>(null);
   const [hasPlayedBefore, setHasPlayedBefore] = useState<boolean>(false);
+  const [gamesPlayed, setGamesPlayed] = useState<number>(0);
+  const [bestScore, setBestScore] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
 
+  // Load game statistics from localStorage
+  const loadGameStats = () => {
+    try {
+      const savedGamesPlayed = localStorage.getItem('dumdoors_games_played');
+      const savedBestScore = localStorage.getItem('dumdoors_best_score');
+      
+      if (savedGamesPlayed) {
+        setGamesPlayed(parseInt(savedGamesPlayed, 10) || 0);
+      }
+      
+      if (savedBestScore) {
+        setBestScore(parseInt(savedBestScore, 10) || null);
+      }
+    } catch (error) {
+      console.error('Failed to load game stats:', error);
+    }
+  };
+
+  // Save game statistics to localStorage
+  const saveGameStats = (newGamesPlayed: number, newBestScore?: number) => {
+    try {
+      localStorage.setItem('dumdoors_games_played', newGamesPlayed.toString());
+      
+      if (newBestScore !== undefined) {
+        const currentBest = bestScore || 0;
+        const updatedBest = Math.max(currentBest, newBestScore);
+        localStorage.setItem('dumdoors_best_score', updatedBest.toString());
+        setBestScore(updatedBest);
+      }
+      
+      setGamesPlayed(newGamesPlayed);
+    } catch (error) {
+      console.error('Failed to save game stats:', error);
+    }
+  };
+
+  // Increment games played counter
+  const incrementGamesPlayed = (finalScore?: number) => {
+    const newCount = gamesPlayed + 1;
+    saveGameStats(newCount, finalScore);
+  };
+
+  // Load game stats on component mount
+  useEffect(() => {
+    loadGameStats();
+  }, []);
 
   // Timer for total game time
   useEffect(() => {
@@ -140,6 +189,23 @@ export const App = () => {
       return () => clearInterval(timer);
     }
   }, [gameState, gameStartTime, isSubmitting]);
+
+  // Timer for response phase (30 seconds per scenario)
+  useEffect(() => {
+    if (gameState === 'playing' && timeLeft > 0 && !isSubmitting && !waitingForNext && !showOutcome && currentScenario) {
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            // Time's up! Auto-submit empty response
+            handleSubmitResponse('');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [gameState, timeLeft, isSubmitting, waitingForNext, showOutcome, currentScenario]);
 
   // Initialize first scenario when game starts
   useEffect(() => {
@@ -192,6 +258,7 @@ export const App = () => {
       };
 
       setCurrentScenario(firstScenario);
+      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
       setScenarioStartTime(Date.now()); // Track when this scenario started
       console.log('✅ [GAME] Game initialized successfully');
     } catch (error) {
@@ -277,6 +344,7 @@ export const App = () => {
     setGameStartTime(null);
     setTotalGameTime(0);
     setScenarioStartTime(null);
+    setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
@@ -314,6 +382,7 @@ export const App = () => {
 
       setCurrentScenario(nextScenario);
       setScenarioStartTime(Date.now()); // Track when this new scenario started
+      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT); // Reset timer for new scenario
       setDoorColor('neutral');
       setCurrentAnalysis(null);
       setShowOutcome(false);
@@ -525,6 +594,10 @@ export const App = () => {
 
         setGameResults(mockResults);
 
+        // Increment games played counter with final score
+        const finalScore = Math.round(averageScore * playerScores.length);
+        incrementGamesPlayed(finalScore);
+
         // Submit to leaderboard
         try {
           console.log('📊 Submitting game results to leaderboard...');
@@ -700,9 +773,13 @@ export const App = () => {
                 </div>
               </button>
 
-              {/* Settings */}
-              <button className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all">
-                <div className="text-white text-sm md:text-xl">⚙️</div>
+              {/* Settings - Disabled */}
+              <button 
+                disabled
+                className="bg-black/20 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/10 opacity-50 cursor-not-allowed"
+                title="Settings (Coming Soon)"
+              >
+                <div className="text-white/60 text-sm md:text-xl">⚙️</div>
               </button>
             </div>
           </div>
@@ -728,8 +805,8 @@ export const App = () => {
           <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10">
             <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
               <div className="text-white text-right">
-                <div className="text-xs md:text-sm text-blue-200 mb-1">🎮 Games: 0</div>
-                <div className="text-xs md:text-sm text-blue-200 mb-1">🏆 Best: --</div>
+                <div className="text-xs md:text-sm text-blue-200 mb-1">🎮 Games: {gamesPlayed}</div>
+                <div className="text-xs md:text-sm text-blue-200 mb-1">🏆 Best: {bestScore ? bestScore : '--'}</div>
                 <div className="flex items-center gap-1 md:gap-2 justify-end">
                   <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-xs md:text-sm">Online</span>
@@ -1110,6 +1187,7 @@ export const App = () => {
                         <div className="flex-1">
                           <VoiceResponseInput
                             onSubmit={handleSubmitResponse}
+                            timeLeft={timeLeft}
                             maxLength={CONFIG.GAME.MAX_RESPONSE_LENGTH}
                             placeholder="Describe what you would do in this situation..."
                             disabled={isSubmitting || !currentScenario || waitingForNext}

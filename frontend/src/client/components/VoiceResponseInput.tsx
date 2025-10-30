@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 
 interface VoiceResponseInputProps {
   onSubmit: (response: string) => void;
+  timeLeft?: number;
   maxLength?: number;
   placeholder?: string;
   disabled?: boolean;
@@ -10,6 +11,7 @@ interface VoiceResponseInputProps {
 
 export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
   onSubmit,
+  timeLeft,
   maxLength = 500,
   placeholder = "Describe what you would do...",
   disabled = false,
@@ -302,8 +304,22 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 relative z-50" style={{ position: 'relative', zIndex: 50 }}>
-      {/* Character Counter */}
-      <div className="flex justify-end items-center">
+      {/* Timer and Character Counter */}
+      <div className="flex justify-between items-center">
+        {/* Timer Display */}
+        {timeLeft !== undefined && (
+          <div className={`text-sm font-bold ${
+            timeLeft <= 10 
+              ? 'text-red-400 animate-pulse' 
+              : timeLeft <= 20 
+                ? 'text-yellow-400' 
+                : 'text-green-400'
+          }`}>
+            ⏰ Time: {timeLeft}s
+          </div>
+        )}
+        
+        {/* Character Counter */}
         <div className="text-sm text-gray-300">
           Character count: {response.length}/{maxLength}
         </div>
