@@ -129,4 +129,10 @@ docker-compose.override.yml
 ehthumbs.db
 Thumbs.db
 
-devvit.yaml
+
+
+# Scripts folder
+scripts/
+config/
+tools/
+.editorconfig
