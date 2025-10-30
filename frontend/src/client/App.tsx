@@ -126,6 +126,7 @@ export const App = () => {
   const [waitingForNext, setWaitingForNext] = useState(false);
   const [showDoorAnimation, setShowDoorAnimation] = useState(false);
   const [showMobileMap, setShowMobileMap] = useState(false);
+  const [gameCompleted, setGameCompleted] = useState(false);
   const [gameResponses, setGameResponses] = useState<Array<{ scenario: string, response: string, score: number }>>([]);
   const [dumStoneReport, setDumStoneReport] = useState<any>(null);
   const [hasPlayedBefore, setHasPlayedBefore] = useState<boolean>(false);
@@ -138,11 +139,11 @@ export const App = () => {
     try {
       const savedGamesPlayed = localStorage.getItem('dumdoors_games_played');
       const savedBestScore = localStorage.getItem('dumdoors_best_score');
-      
+
       if (savedGamesPlayed) {
         setGamesPlayed(parseInt(savedGamesPlayed, 10) || 0);
       }
-      
+
       if (savedBestScore) {
         setBestScore(parseInt(savedBestScore, 10) || null);
       }
@@ -155,14 +156,14 @@ export const App = () => {
   const saveGameStats = (newGamesPlayed: number, newBestScore?: number) => {
     try {
       localStorage.setItem('dumdoors_games_played', newGamesPlayed.toString());
-      
+
       if (newBestScore !== undefined) {
         const currentBest = bestScore || 0;
         const updatedBest = Math.max(currentBest, newBestScore);
         localStorage.setItem('dumdoors_best_score', updatedBest.toString());
         setBestScore(updatedBest);
       }
-      
+
       setGamesPlayed(newGamesPlayed);
     } catch (error) {
       console.error('Failed to save game stats:', error);
@@ -344,7 +345,7 @@ export const App = () => {
     setGameStartTime(null);
     setTotalGameTime(0);
     setScenarioStartTime(null);
-    setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+    setGameCompleted(false);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
@@ -556,89 +557,9 @@ export const App = () => {
 
       // Check if game is complete
       if (gamePath.currentPosition >= gamePath.totalLength - 1) {
-        // Game completed - show results
-        const averageScore = playerScores.reduce((a, b) => a + b, 0) / playerScores.length;
-
-        // Format total game time
-        const formatGameTime = (seconds: number): string => {
-          const mins = Math.floor(seconds / 60);
-          const secs = seconds % 60;
-          return `${mins}m ${secs}s`;
-        };
-
-        const gameTimeFormatted = formatGameTime(totalGameTime);
-
-        const mockResults: GameResultsType = {
-          winner: 'player1',
-          rankings: [
-            {
-              playerId: 'player1',
-              username: username || 'You',
-              position: 1,
-              totalScore: Math.round(averageScore * playerScores.length),
-              completionTime: gameTimeFormatted,
-            },
-          ],
-          statistics: [
-            {
-              playerId: 'player1',
-              averageScore: Math.round(averageScore * 10) / 10,
-              doorsCompleted: gamePath.currentPosition,
-              totalTime: totalGameTime.toString(), // Store as seconds for calculations
-            },
-          ],
-          sessionId: `demo-session-${Date.now()}`,
-          gameMode: 'single-player',
-          completedAt: new Date().toISOString(),
-        };
-
-        setGameResults(mockResults);
-
-        // Increment games played counter with final score
-        const finalScore = Math.round(averageScore * playerScores.length);
-        incrementGamesPlayed(finalScore);
-
-        // Submit to leaderboard
-        try {
-          console.log('📊 Submitting game results to leaderboard...');
-          const response = await fetch('/api/leaderboard/submit', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              gameResults: mockResults,
-              gameResponses: gameResponses, // Include game responses for DumStone
-            }),
-          });
-
-          if (response.ok) {
-            console.log('✅ Game results submitted to leaderboard successfully');
-
-            // Update hasPlayedBefore state since user just completed a game
-            setHasPlayedBefore(true);
-
-            // Update user flair if we have a username
-            if (username) {
-              try {
-                await fetch(`/api/reddit/update-flair/${username}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                });
-                console.log('✅ User flair update requested');
-              } catch (flairError) {
-                console.warn('⚠️ Failed to update flair:', flairError);
-              }
-            }
-          } else {
-            console.warn('⚠️ Failed to submit to leaderboard:', await response.text());
-          }
-        } catch (leaderboardError) {
-          console.error('❌ Error submitting to leaderboard:', leaderboardError);
-          // Don't block the game flow if leaderboard submission fails
-        }
-
-        setGameState('results');
+        // Game completed - show completion message and wait for user
+        setGameCompleted(true);
+        setWaitingForNext(false); // Hide the "Continue to Next Door" button
       } else {
         // Wait for user to click next
         setWaitingForNext(true);
@@ -647,6 +568,96 @@ export const App = () => {
       handleError(error as Error, 'submit_response');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Handle final results generation when user clicks "View Results"
+  const handleViewResults = async () => {
+    try {
+      const averageScore = playerScores.reduce((a, b) => a + b, 0) / playerScores.length;
+
+      // Format total game time
+      const formatGameTime = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+      };
+
+      const gameTimeFormatted = formatGameTime(totalGameTime);
+
+      const mockResults: GameResultsType = {
+        winner: 'player1',
+        rankings: [
+          {
+            playerId: 'player1',
+            username: username || 'You',
+            position: 1,
+            totalScore: Math.round(averageScore * playerScores.length),
+            completionTime: gameTimeFormatted,
+          },
+        ],
+        statistics: [
+          {
+            playerId: 'player1',
+            averageScore: Math.round(averageScore * 10) / 10,
+            doorsCompleted: gamePath.currentPosition,
+            totalTime: totalGameTime.toString(), // Store as seconds for calculations
+          },
+        ],
+        sessionId: `demo-session-${Date.now()}`,
+        gameMode: 'single-player',
+        completedAt: new Date().toISOString(),
+      };
+
+      setGameResults(mockResults);
+
+      // Increment games played counter with final score
+      const finalScore = Math.round(averageScore * playerScores.length);
+      incrementGamesPlayed(finalScore);
+
+      // Submit to leaderboard
+      try {
+        console.log('📊 Submitting game results to leaderboard...');
+        const response = await fetch('/api/leaderboard/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gameResults: mockResults,
+            gameResponses: gameResponses, // Include game responses for DumStone
+          }),
+        });
+
+        if (response.ok) {
+          console.log('✅ Game results submitted to leaderboard successfully');
+
+          // Update hasPlayedBefore state since user just completed a game
+          setHasPlayedBefore(true);
+
+          // Update user flair if we have a username
+          if (username) {
+            try {
+              await fetch(`/api/reddit/update-flair/${username}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              });
+              console.log('✅ User flair update requested');
+            } catch (flairError) {
+              console.warn('⚠️ Failed to update flair:', flairError);
+            }
+          }
+        } else {
+          console.warn('⚠️ Failed to submit to leaderboard:', await response.text());
+        }
+      } catch (leaderboardError) {
+        console.error('❌ Error submitting to leaderboard:', leaderboardError);
+        // Don't block the game flow if leaderboard submission fails
+      }
+
+      setGameState('results');
+    } catch (error) {
+      console.error('Error generating results:', error);
     }
   };
 
@@ -774,7 +785,7 @@ export const App = () => {
               </button>
 
               {/* Settings - Disabled */}
-              <button 
+              <button
                 disabled
                 className="bg-black/20 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/10 opacity-50 cursor-not-allowed"
                 title="Settings (Coming Soon)"
@@ -852,8 +863,8 @@ export const App = () => {
                   onClick={(gameResponses.length > 0 || hasPlayedBefore) ? handleViewDumStones : undefined}
                   disabled={gameResponses.length === 0 && !hasPlayedBefore}
                   className={`px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg transition-all duration-200 shadow-2xl border-2 ${(gameResponses.length > 0 || hasPlayedBefore)
-                      ? 'bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25 cursor-pointer'
-                      : 'bg-gradient-to-r from-gray-600/50 via-gray-700/50 to-gray-800/50 backdrop-blur-sm text-gray-400 border-gray-500/40 cursor-not-allowed opacity-60'
+                    ? 'bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25 cursor-pointer'
+                    : 'bg-gradient-to-r from-gray-600/50 via-gray-700/50 to-gray-800/50 backdrop-blur-sm text-gray-400 border-gray-500/40 cursor-not-allowed opacity-60'
                     }`}
                   title={(gameResponses.length === 0 && !hasPlayedBefore) ? 'Play at least one game to unlock your DumStone' : 'View your DumStone'}
                 >
@@ -1234,13 +1245,25 @@ export const App = () => {
                         )}
 
                         {/* Next Button */}
-                        {waitingForNext && (
+                        {waitingForNext && !gameCompleted && (
                           <div className="text-center flex-shrink-0">
                             <button
                               onClick={handleNextScenario}
                               className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 md:px-8 py-2 md:py-3 rounded-xl font-semibold text-base md:text-lg hover:from-blue-700 hover:to-blue-800 transform hover:scale-105 transition-all duration-200 shadow-lg animate-pulse"
                             >
                               Continue to Next Door →
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Game Completion - View Results Button */}
+                        {gameCompleted && (
+                          <div className="text-center flex-shrink-0">
+                            <button
+                              onClick={handleViewResults}
+                              className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-yellow-600 hover:to-orange-700 transform hover:scale-105 transition-all duration-200 shadow-lg animate-pulse"
+                            >
+                              🏆 View Results
                             </button>
                           </div>
                         )}
