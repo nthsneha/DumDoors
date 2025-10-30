@@ -210,21 +210,21 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
         {/* Stats Summary */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/5 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-400">{stats.totalGamesCompleted}</div>
-              <div className="text-xs text-white/60">Games Completed</div>
+            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
+              <div className="text-3xl font-black text-blue-400">{stats.totalGamesCompleted}</div>
+              <div className="text-sm text-white/70 font-medium">Games Completed</div>
             </div>
-            <div className="bg-white/5 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-400">{formatTime(stats.fastestEverTime)}</div>
-              <div className="text-xs text-white/60">Fastest Time</div>
+            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
+              <div className="text-3xl font-black text-green-400">{formatTime(stats.fastestEverTime)}</div>
+              <div className="text-sm text-white/70 font-medium">Fastest Time</div>
             </div>
-            <div className="bg-white/5 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-yellow-400">{formatScore(stats.highestEverAverage)}</div>
-              <div className="text-xs text-white/60">Highest Average</div>
+            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
+              <div className="text-3xl font-black text-yellow-400">{formatScore(stats.highestEverAverage)}</div>
+              <div className="text-sm text-white/70 font-medium">Highest Average</div>
             </div>
-            <div className="bg-white/5 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-400">{formatTime(stats.averageCompletionTime)}</div>
-              <div className="text-xs text-white/60">Avg. Time</div>
+            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
+              <div className="text-3xl font-black text-blue-400">{formatTime(stats.averageCompletionTime)}</div>
+              <div className="text-sm text-white/70 font-medium">Avg. Time</div>
             </div>
           </div>
         )}
@@ -303,25 +303,25 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
             <p>No entries found for this category</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {categoryData.map((entry, index) => (
               <div
                 key={entry.id}
-                className={`flex items-center justify-between p-3 rounded-lg transition-all hover:bg-white/10 ${
-                  index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30' :
-                  index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border border-gray-400/30' :
-                  index === 2 ? 'bg-gradient-to-r from-amber-600/20 to-amber-700/20 border border-amber-600/30' :
-                  'bg-white/5'
+                className={`flex items-center justify-between p-4 rounded-xl transition-all hover:bg-white/15 border ${
+                  index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/40 shadow-lg' :
+                  index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-gray-400/40 shadow-lg' :
+                  index === 2 ? 'bg-gradient-to-r from-amber-600/20 to-amber-700/20 border-amber-600/40 shadow-lg' :
+                  'bg-white/10 border-white/20'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                    index === 0 ? 'bg-yellow-500 text-yellow-900' :
-                    index === 1 ? 'bg-gray-400 text-gray-900' :
-                    index === 2 ? 'bg-amber-600 text-amber-900' :
-                    'bg-white/20 text-white'
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg ${
+                    index === 0 ? 'bg-yellow-500 text-yellow-900 shadow-lg' :
+                    index === 1 ? 'bg-gray-400 text-gray-900 shadow-lg' :
+                    index === 2 ? 'bg-amber-600 text-amber-900 shadow-lg' :
+                    'bg-white/30 text-white shadow-md'
                   }`}>
-                    {index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}
+                    {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
                   </div>
                   
                   <div>
@@ -354,13 +354,13 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
                 </div>
 
                 <div className="text-right">
-                  <div className="font-bold text-white">
+                  <div className="font-black text-xl text-white">
                     {activeCategory === 'fastest' && formatTime(entry.completionTime)}
                     {activeCategory === 'highest' && formatScore(entry.averageScore)}
                     {activeCategory === 'most' && `${entry.doorsCompleted} doors`}
                     {activeCategory === 'recent' && formatTime(entry.completionTime)}
                   </div>
-                  <div className="text-xs text-white/60">
+                  <div className="text-sm text-white/70 font-medium">
                     {activeCategory === 'fastest' && `${formatScore(entry.averageScore)} avg`}
                     {activeCategory === 'highest' && `${entry.doorsCompleted} doors`}
                     {activeCategory === 'most' && `${formatScore(entry.averageScore)} avg`}
