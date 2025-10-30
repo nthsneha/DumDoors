@@ -1234,10 +1234,51 @@ export const App = () => {
             {/* Content */}
             <div className="flex justify-center">
               {dumStoneReport === 'generating' && (
-                <div className="bg-white rounded-2xl p-8 text-center max-w-md">
-                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-                  <div className="text-xl font-bold mb-2 text-gray-800">AI is analyzing your personality...</div>
-                  <div className="text-gray-600">Preparing your DumStone... 🪦</div>
+                <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+                  {/* Full-screen waiting video */}
+                  <div className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-6 lg:p-8">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full max-w-2xl h-auto object-contain rounded-2xl border-4 border-purple-400/50 shadow-2xl shadow-purple-500/30"
+                      onError={(e) => {
+                        console.log('Waiting video failed to load:', e);
+                        // Show fallback content
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    >
+                      <source src="/waiting.mp4" type="video/mp4" />
+                    </video>
+                    
+                    {/* Fallback content if video fails */}
+                    <div className="w-full max-w-2xl h-96 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl border-4 border-purple-400/50 flex items-center justify-center" style={{ display: 'none' }}>
+                      <div className="text-center text-white">
+                        <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-white mx-auto mb-4"></div>
+                        <div className="text-2xl font-bold">Analyzing...</div>
+                      </div>
+                    </div>
+
+                    {/* Text overlay at bottom */}
+                    <div className="absolute bottom-8 left-0 right-0 text-center">
+                      <div className="bg-black/80 backdrop-blur-lg rounded-2xl p-4 md:p-6 mx-4 border border-purple-400/30">
+                        <div className="text-2xl md:text-3xl font-bold text-white mb-2 animate-pulse">
+                          AI is analyzing your personality...
+                        </div>
+                        <div className="text-purple-300 text-lg md:text-xl">
+                          Preparing your DumStone... 🪦
+                        </div>
+                        
+                        {/* Loading dots */}
+                        <div className="flex justify-center mt-3 space-x-2">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
