@@ -667,9 +667,9 @@ export const App = () => {
         </div>
 
         {/* Floating Multi-Player Notice - Central Bottom */}
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-[500px] max-w-[90vw] overflow-hidden bg-gradient-to-r from-orange-600/80 via-orange-500/80 to-amber-600/80 backdrop-blur-sm border border-white/20 rounded-lg shadow-lg">
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-[500px] max-w-[90vw] overflow-hidden border border-white/10 rounded-lg">
           <div className="relative h-10 flex items-center">
-            <div className="animate-marquee whitespace-nowrap text-white font-bold text-base tracking-wide">
+            <div className="animate-marquee whitespace-nowrap text-white font-bold text-base tracking-wide drop-shadow-lg">
               🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮
             </div>
           </div>
