@@ -124,7 +124,7 @@ export function createSplashScreen() {
         /* Logo/Title Section */
         .logo-section {
           margin-bottom: 2rem;
-          animation: fadeInUp 1s ease-out;
+          animation: bounce-in 1.2s ease-out;
         }
 
         .game-logo {
@@ -281,7 +281,7 @@ export function createSplashScreen() {
         /* Feature Highlights */
         .features {
           margin: 2rem 0;
-          animation: fadeInUp 1s ease-out 0.4s both;
+          animation: bounce-in 1s ease-out 0.6s both;
         }
 
         .feature-grid {
@@ -302,7 +302,13 @@ export function createSplashScreen() {
           box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
           position: relative;
           overflow: hidden;
+          animation: bounce-in 0.8s ease-out;
         }
+
+        .feature-item:nth-child(1) { animation-delay: 0.7s; animation-fill-mode: both; }
+        .feature-item:nth-child(2) { animation-delay: 0.8s; animation-fill-mode: both; }
+        .feature-item:nth-child(3) { animation-delay: 0.9s; animation-fill-mode: both; }
+        .feature-item:nth-child(4) { animation-delay: 1.0s; animation-fill-mode: both; }
 
         .feature-item::before {
           content: '';
@@ -353,7 +359,7 @@ export function createSplashScreen() {
 
         /* Play Button */
         .play-button-container {
-          animation: fadeInUp 1s ease-out 0.7s both;
+          animation: bounce-in 1s ease-out 0.8s both;
           position: relative;
         }
 
@@ -478,6 +484,25 @@ export function createSplashScreen() {
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+
+        /* Popup bounce-in animation */
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: scale(0.3) translateY(-50px);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.05) translateY(0);
+          }
+          70% {
+            transform: scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
           }
         }
 
@@ -769,6 +794,11 @@ export function createSplashScreen() {
         <!-- Game Description -->
         <div class="game-description">
           <p>Face impossible scenarios, make tough decisions, and discover what your choices reveal about you. Get hilariously roasted by AI, explore dynamic adventure maps, and see how your decisions shape your destiny!</p>
+          <div class="cta-message" style="margin-top: 1rem; animation: bounce-in 1s ease-out 1.2s both;">
+            <p style="color: #fbbf24; font-weight: bold; font-size: 1.1rem; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);">
+              🎯 Every choice matters • 🤖 AI judges your decisions • 🏆 Climb the leaderboards
+            </p>
+          </div>
         </div>
 
         <!-- Feature Highlights -->
@@ -830,14 +860,19 @@ export function createSplashScreen() {
           const button = document.querySelector('.play-button');
           button.style.transform = 'translateY(-1px) scale(1.02)';
           button.style.background = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 30%, #d97706 70%, #b45309 100%)';
+          button.style.animation = 'none'; // Stop the pulse animation
           
-          // Add loading state
+          // Add loading state with bounce animation
           const originalText = button.innerHTML;
           button.innerHTML = '<span class="play-icon">🌀</span>Opening Doors...';
           button.disabled = true;
+          button.style.animation = 'bounce-in 0.6s ease-out infinite alternate';
           
           // Create launch effect
           createLaunchEffect();
+          
+          // Add screen shake effect
+          document.body.style.animation = 'shake 0.5s ease-in-out';
           
           // Launch the full game
           setTimeout(() => {
@@ -927,6 +962,12 @@ export function createSplashScreen() {
               transform: translate(-50%, -50%) scale(50);
               opacity: 0;
             }
+          }
+          
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+            20%, 40%, 60%, 80% { transform: translateX(2px); }
           }
         \`;
         document.head.appendChild(style);

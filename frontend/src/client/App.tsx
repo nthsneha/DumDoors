@@ -1049,16 +1049,54 @@ export const App = () => {
                   )}
                 </div>
 
-                {/* Processing Overlay */}
+                {/* AnnoyedDoru Full Scenario Section Overlay */}
                 {isSubmitting && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-3xl z-10">
-                    <div className="text-center text-white bg-black/70 backdrop-blur-lg rounded-2xl p-6 lg:p-8 border border-white/30 mx-4">
-                      <div className="animate-spin rounded-full h-16 lg:h-20 w-16 lg:w-20 border-b-4 border-white mx-auto mb-4 lg:mb-6"></div>
-                      <div className="text-xl lg:text-2xl font-bold mb-2">
-                        AI is analyzing your response...
-                      </div>
-                      <div className="text-gray-300 text-base lg:text-lg">
-                        This may take a moment
+                  <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-sm rounded-3xl">
+                    {/* Full scenario section - AnnoyedDoru Video */}
+                    <div className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-6 lg:p-8">
+                      {/* Full-height video container that fills the entire scenario section */}
+                      <div className="relative w-full h-full flex flex-col items-center justify-center">
+                        <video
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover rounded-2xl border-4 border-orange-400/50 shadow-2xl shadow-orange-500/30"
+                          onError={(e) => {
+                            console.log('AnnoyedDoru video failed to load:', e);
+                            // Show fallback content
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        >
+                          <source src="/Doru/AnnoyedDoru.mp4" type="video/mp4" />
+                        </video>
+                        
+                        {/* Fallback content if video fails */}
+                        <div className="w-full h-full bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl border-4 border-orange-400/50 flex items-center justify-center" style={{ display: 'none' }}>
+                          <div className="text-center text-white">
+                            <div className="animate-spin rounded-full h-20 w-20 border-b-4 border-white mx-auto mb-4"></div>
+                            <div className="text-xl font-bold">Loading...</div>
+                          </div>
+                        </div>
+
+                        {/* Text overlay at bottom */}
+                        <div className="absolute bottom-4 md:bottom-6 lg:bottom-8 left-0 right-0 text-center">
+                          <div className="bg-black/80 backdrop-blur-lg rounded-2xl p-3 md:p-4 lg:p-6 mx-4 border border-orange-400/30">
+                            <div className="text-xl md:text-2xl lg:text-3xl font-bold text-white mb-2 animate-pulse">
+                              Ahh i gotta wait..
+                            </div>
+                            <div className="text-orange-300 text-base md:text-lg lg:text-xl">
+                              AI is thinking... 🤔
+                            </div>
+                            
+                            {/* Loading dots */}
+                            <div className="flex justify-center mt-3 space-x-2">
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
