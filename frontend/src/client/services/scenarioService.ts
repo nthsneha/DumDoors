@@ -1,133 +1,65 @@
-interface ScenarioData {
-  scenario: string;
-  reasoning: string;
-}
+import { SCENARIOS, type ScenarioData } from '../data/scenarios';
 
 class ScenarioService {
   private scenarios: ScenarioData[] = [];
+  private shuffledScenarios: ScenarioData[] = [];
+  private scenarioQueue: ScenarioData[] = [];
   private usedScenarios: Set<number> = new Set();
   private isLoaded = false;
 
-  // Load scenarios from CSV data
-  private async loadScenarios(): Promise<void> {
+  // Fisher-Yates shuffle algorithm
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = shuffled[i]!;
+      shuffled[i] = shuffled[j]!;
+      shuffled[j] = temp;
+    }
+    return shuffled;
+  }
+
+  // Load scenarios from hardcoded data
+  private loadScenarios(): void {
     if (this.isLoaded) return;
 
-    try {
-      // Load the full reasoning dataset CSV file
-      const response = await fetch('/data/reasoning_dataset.csv');
-      if (!response.ok) {
-        throw new Error(`Failed to fetch CSV: ${response.status}`);
-      }
+    console.log('🔄 [SCENARIO] Loading hardcoded scenarios...');
 
-      const csvData = await response.text();
-      this.scenarios = this.parseCsv(csvData);
+    // Use the hardcoded scenarios directly
+    this.scenarios = SCENARIOS;
 
-      console.log(`✅ Loaded ${this.scenarios.length} scenarios from reasoning_dataset.csv`);
-      this.isLoaded = true;
-    } catch (error) {
-      console.error('Failed to load scenarios from CSV file, using fallback:', error);
+    // Shuffle scenarios to randomize order
+    this.shuffledScenarios = this.shuffleArray([...this.scenarios]);
+    this.scenarioQueue = [...this.shuffledScenarios];
 
-      // Fallback to a few hardcoded scenarios if CSV loading fails
-      this.scenarios = [
-        {
-          scenario: "You're cycling in a narrow path and you see a herd of bulls charging at you.",
-          reasoning: "WORST move: Cycling furiously toward them like you're starring in your own action movie - congratulations, you're now a human pancake and the bulls are telling their grandkids about 'that idiot cyclist.' BEST move: Calmly dismount and step aside like a matador with common sense."
-        },
-        {
-          scenario: "You are allergic to laughter and attending a stand up show.",
-          reasoning: "WORST move: Stay in your seat out of politeness and laugh along, resulting in your face swelling up like a balloon animal until you look like the Michelin Man's distant cousin. BEST move: Leave immediately or pop antihistamines like candy."
-        },
-        {
-          scenario: "Your phone freezes while taking a selfie with a celebrity you accidentally met.",
-          reasoning: "WORST move: Shake your phone violently while screaming 'WORK, YOU PIECE OF JUNK' at the celebrity, who slowly backs away thinking you're having a mental episode. BEST move: Laugh it off and ask if they'd mind trying again."
-        }
-      ];
-      this.isLoaded = true;
-    }
-  }
-
-  private parseCsv(csvData: string): ScenarioData[] {
-    const lines = csvData.split('\n');
-    const scenarios: ScenarioData[] = [];
-
-    // Skip header row
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      try {
-        // Enhanced CSV parsing - handles quoted fields with escaped quotes
-        const result = this.parseCSVLine(line);
-        if (result && result.length >= 2) {
-          scenarios.push({
-            scenario: result[0],
-            reasoning: result[1]
-          });
-        }
-      } catch (error) {
-        console.warn(`Failed to parse CSV line ${i + 1}:`, line, error);
-      }
-    }
-
-    return scenarios;
-  }
-
-  private parseCSVLine(line: string): string[] {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    let i = 0;
-
-    while (i < line.length) {
-      const char = line[i];
-
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          // Escaped quote
-          current += '"';
-          i += 2;
-        } else {
-          // Toggle quote state
-          inQuotes = !inQuotes;
-          i++;
-        }
-      } else if (char === ',' && !inQuotes) {
-        // Field separator
-        result.push(current);
-        current = '';
-        i++;
-      } else {
-        current += char;
-        i++;
-      }
-    }
-
-    // Add the last field
-    result.push(current);
-
-    return result;
+    console.log(`✅ [SCENARIO] Loaded ${this.scenarios.length} hardcoded scenarios`);
+    this.isLoaded = true;
   }
 
 
 
-  async getRandomScenario(): Promise<ScenarioData> {
-    await this.loadScenarios();
 
-    // If all scenarios have been used, reset
-    if (this.usedScenarios.size >= this.scenarios.length) {
-      this.usedScenarios.clear();
+
+  getRandomScenario(): ScenarioData {
+    console.log('🎲 [SCENARIO] Getting random scenario...');
+
+    this.loadScenarios();
+
+    // If queue is empty, refill with a fresh shuffle
+    if (this.scenarioQueue.length === 0) {
+      this.scenarioQueue = this.shuffleArray([...this.scenarios]);
+      console.log(`🔄 [SCENARIO] Refilled scenario queue with ${this.scenarioQueue.length} shuffled scenarios`);
     }
 
-    let randomIndex: number;
-    do {
-      randomIndex = Math.floor(Math.random() * this.scenarios.length);
-    } while (this.usedScenarios.has(randomIndex));
-
-    this.usedScenarios.add(randomIndex);
-    const scenario = this.scenarios[randomIndex];
+    // Pop the next scenario from the queue
+    const scenario = this.scenarioQueue.shift();
     if (!scenario) {
-      throw new Error('No scenario found at index');
+      console.error('❌ [SCENARIO] No scenario available in queue, total scenarios:', this.scenarios.length);
+      throw new Error('No scenario available in queue');
     }
+
+    console.log(`📄 [SCENARIO] Serving scenario from queue. ${this.scenarioQueue.length} remaining.`);
+    console.log(`📝 [SCENARIO] Scenario preview:`, scenario.scenario.substring(0, 100) + '...');
     return scenario;
   }
 
@@ -148,6 +80,17 @@ class ScenarioService {
 
   resetUsedScenarios(): void {
     this.usedScenarios.clear();
+  }
+
+  // Reset and reshuffle the scenario queue
+  resetScenarioQueue(): void {
+    this.scenarioQueue = this.shuffleArray([...this.scenarios]);
+    console.log(`🔄 Reset and reshuffled scenario queue with ${this.scenarioQueue.length} scenarios`);
+  }
+
+  // Get remaining scenarios in queue
+  getRemainingInQueue(): number {
+    return this.scenarioQueue.length;
   }
 }
 

@@ -2,7 +2,7 @@ import express from 'express';
 import { InitResponse, IncrementResponse, DecrementResponse } from '../shared/types/api';
 import { redis, reddit, createServer, context, getServerPort, settings } from '@devvit/web/server';
 import { createPost } from './core/post';
-import { createSplashScreen } from './core/splash';
+// import { createSplashScreen } from './core/splash';
 import { leaderboardService } from './services/leaderboardService';
 import { redditIntegrationService } from './services/redditIntegrationService';
 
@@ -21,19 +21,19 @@ app.use(express.text());
 const router = express.Router();
 
 // Splash screen endpoint
-router.get('/splash', async (_req, res): Promise<void> => {
-  try {
-    const splashHtml = createSplashScreen();
-    res.setHeader('Content-Type', 'text/html');
-    res.send(splashHtml);
-  } catch (error) {
-    console.error('Splash screen error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Failed to generate splash screen',
-    });
-  }
-});
+// router.get('/splash', async (_req, res): Promise<void> => {
+//   try {
+//     const splashHtml = createSplashScreen();
+//     res.setHeader('Content-Type', 'text/html');
+//     res.send(splashHtml);
+//   } catch (error) {
+//     console.error('Splash screen error:', error);
+//     res.status(500).json({
+//       status: 'error',
+//       message: 'Failed to generate splash screen',
+//     });
+//   }
+// });
 
 router.get<{ postId: string }, InitResponse | { status: string; message: string }>(
   '/api/init',
@@ -395,8 +395,7 @@ Create a funny, roasting personality report. Be witty and entertaining but not c
 Respond with ONLY this JSON:
 {
   "title": "A funny personality type name (e.g. 'The Chaos Goblin')",
-  "personality": "Short personality description",
-  "roast": "A hilarious 2-3 sentence roast of their decision-making style",
+  "roast": "A hilarious 1 sentence roast of their decision-making style",
   "strengths": ["3-4 funny strengths based on their responses"],
   "weaknesses": ["3-4 funny weaknesses based on their responses"], 
   "funnyQuote": "A fake quote that sounds like something they'd say",
@@ -726,6 +725,10 @@ router.post('/internal/menu/post-create', async (_req, res): Promise<void> => {
   }
 });
 
+
+
+
+
 // Proxy middleware for game API calls to backend
 router.all('/api/game/:gameId', async (req, res): Promise<void> => {
   try {
@@ -763,7 +766,7 @@ router.all('/api/game/:gameId', async (req, res): Promise<void> => {
 router.get('/api/leaderboard', async (req, res): Promise<void> => {
   try {
     console.log('🏆 [SERVER DEBUG] Getting leaderboard with query:', req.query);
-    
+
     const gameMode = req.query.gameMode as any;
     const theme = req.query.theme as string;
     const timeRange = (req.query.timeRange as any) || 'all';
@@ -791,9 +794,9 @@ router.get('/api/leaderboard', async (req, res): Promise<void> => {
 router.get('/api/leaderboard/stats', async (req, res): Promise<void> => {
   try {
     console.log('📊 [SERVER DEBUG] Getting leaderboard stats');
-    
+
     const stats = await leaderboardService.getLeaderboardStats();
-    
+
     console.log('✅ [SERVER DEBUG] Stats retrieved successfully');
     res.json(stats);
   } catch (error) {
@@ -809,9 +812,9 @@ router.get('/api/leaderboard/stats', async (req, res): Promise<void> => {
 router.post('/api/leaderboard/submit', async (req, res): Promise<void> => {
   try {
     console.log('🎮 [SERVER DEBUG] Submitting game result to leaderboard');
-    
+
     const { gameResults } = req.body;
-    
+
     if (!gameResults) {
       res.status(400).json({
         status: 'error',
@@ -830,7 +833,7 @@ router.post('/api/leaderboard/submit', async (req, res): Promise<void> => {
     }
 
     await leaderboardService.submitGameResult(gameResults, redditUserId);
-    
+
     console.log('✅ [SERVER DEBUG] Game result submitted successfully');
     res.json({
       status: 'success',
@@ -849,10 +852,10 @@ router.post('/api/leaderboard/submit', async (req, res): Promise<void> => {
 router.get('/api/leaderboard/user/:userId', async (req, res): Promise<void> => {
   try {
     console.log('👤 [SERVER DEBUG] Getting user stats for:', req.params.userId);
-    
+
     const userId = req.params.userId;
     const userStats = await leaderboardService.getUserStats(userId);
-    
+
     console.log('✅ [SERVER DEBUG] User stats retrieved successfully');
     res.json(userStats);
   } catch (error) {
@@ -869,9 +872,9 @@ router.get('/api/leaderboard/daily/:date', async (req, res): Promise<void> => {
   try {
     const date = req.params.date;
     console.log('📅 [SERVER DEBUG] Getting daily leaderboard for:', date);
-    
+
     const dailyLeaderboard = await leaderboardService.getDailyLeaderboard(date);
-    
+
     console.log('✅ [SERVER DEBUG] Daily leaderboard retrieved successfully');
     res.json(dailyLeaderboard);
   } catch (error) {
@@ -887,9 +890,9 @@ router.get('/api/leaderboard/daily/:date', async (req, res): Promise<void> => {
 router.get('/api/leaderboard/daily', async (req, res): Promise<void> => {
   try {
     console.log('📅 [SERVER DEBUG] Getting daily leaderboard for today');
-    
+
     const dailyLeaderboard = await leaderboardService.getDailyLeaderboard();
-    
+
     console.log('✅ [SERVER DEBUG] Daily leaderboard retrieved successfully');
     res.json(dailyLeaderboard);
   } catch (error) {
@@ -905,10 +908,10 @@ router.get('/api/leaderboard/daily', async (req, res): Promise<void> => {
 router.post('/api/reddit/daily-leaderboard', async (req, res): Promise<void> => {
   try {
     console.log('📅 [SERVER DEBUG] Posting daily leaderboard to Reddit');
-    
+
     const { date } = req.body;
     const postId = await redditIntegrationService.postDailyLeaderboard(date);
-    
+
     if (postId) {
       console.log('✅ [SERVER DEBUG] Daily leaderboard posted successfully');
       res.json({
@@ -934,9 +937,9 @@ router.post('/api/reddit/daily-leaderboard', async (req, res): Promise<void> => 
 router.post('/api/reddit/weekly-leaderboard', async (req, res): Promise<void> => {
   try {
     console.log('📊 [SERVER DEBUG] Posting weekly leaderboard to Reddit');
-    
+
     const postId = await redditIntegrationService.postWeeklyLeaderboard();
-    
+
     if (postId) {
       console.log('✅ [SERVER DEBUG] Weekly leaderboard posted successfully');
       res.json({
@@ -959,13 +962,15 @@ router.post('/api/reddit/weekly-leaderboard', async (req, res): Promise<void> =>
   }
 });
 
+
+
 router.get('/api/reddit/user/:username/stats', async (req, res): Promise<void> => {
   try {
     console.log('👤 [SERVER DEBUG] Getting Reddit user stats for:', req.params.username);
-    
+
     const username = req.params.username;
     const userStats = await redditIntegrationService.getUserRedditStats(username);
-    
+
     if (userStats) {
       console.log('✅ [SERVER DEBUG] Reddit user stats retrieved successfully');
       res.json(userStats);
@@ -987,10 +992,10 @@ router.get('/api/reddit/user/:username/stats', async (req, res): Promise<void> =
 router.post('/api/reddit/update-flair/:username', async (req, res): Promise<void> => {
   try {
     console.log('🏷️ [SERVER DEBUG] Updating flair for:', req.params.username);
-    
+
     const username = req.params.username;
     await redditIntegrationService.updateUserFlair(username);
-    
+
     console.log('✅ [SERVER DEBUG] User flair updated successfully');
     res.json({
       status: 'success',

@@ -902,7 +902,7 @@ export function createSplashScreen() {
 
         // Add sparkle and launch animations
         const style = document.createElement('style');
-        style.textContent = \`
+        style.textContent = `
           @keyframes sparkleAnimation {
             0% {
               transform: scale(0) rotate(0deg);
@@ -928,7 +928,7 @@ export function createSplashScreen() {
               opacity: 0;
             }
           }
-        \`;
+        `;
         document.head.appendChild(style);
 
         // Preload game assets for faster launch
@@ -945,8 +945,8 @@ export function createSplashScreen() {
         preloadImages.forEach(src => {
           const img = new Image();
           img.src = src;
-          img.onload = () => console.log(`✅ Preloaded: ${src}`);
-          img.onerror = () => console.log(`❌ Failed to preload: ${src}`);
+          img.onload = () => console.log(`[SUCCESS] Preloaded: ${src}`);
+          img.onerror = () => console.log(`[ERROR] Failed to preload: ${src}`);
         });
 
         // Add some interactive door opening sounds (if available)
