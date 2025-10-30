@@ -843,6 +843,49 @@ router.get('/api/user/has-played', async (req, res): Promise<void> => {
   }
 });
 
+// Get user game statistics
+router.get('/api/user/stats', async (req, res): Promise<void> => {
+  try {
+    // Get current Reddit user ID
+    let redditUserId;
+    try {
+      const currentUser = await reddit.getCurrentUser();
+      redditUserId = currentUser?.id;
+    } catch (error) {
+      console.warn('Could not get current Reddit user:', error);
+    }
+
+    if (!redditUserId) {
+      res.json({
+        status: 'success',
+        stats: {
+          totalGamesPlayed: 0,
+          bestScore: 0,
+          averageScore: 0,
+        },
+      });
+      return;
+    }
+
+    const userStats = await leaderboardService.getUserStats(redditUserId);
+
+    res.json({
+      status: 'success',
+      stats: {
+        totalGamesPlayed: userStats.totalGamesPlayed,
+        bestScore: userStats.personalBest?.totalScore || 0,
+        averageScore: userStats.averageScore,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting user stats:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get user stats',
+    });
+  }
+});
+
 // Get user responses for DumStone generation
 router.get('/api/user/responses', async (req, res): Promise<void> => {
   try {

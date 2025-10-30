@@ -2,11 +2,20 @@ import { useState, useEffect } from 'react';
 import { useCounter } from './hooks/useCounter';
 
 // Waiting Screen Component with Video Fallback
-const WaitingScreen = () => {
+const WaitingScreen = ({ onBack }: { onBack: () => void }) => {
   const [videoError, setVideoError] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+      {/* Back Button - Top Right */}
+      <button
+        onClick={onBack}
+        className="fixed top-4 right-4 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center transition-colors z-50 border-2 border-white/20 backdrop-blur-sm"
+        title="Back to Menu"
+      >
+        <span className="text-xl">✕</span>
+      </button>
+
       <div className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-6 lg:p-8">
         {!videoError ? (
           <video
@@ -23,7 +32,7 @@ const WaitingScreen = () => {
               console.log('Waiting video loaded successfully');
             }}
           >
-            <source src="/waiting.mp4" type="video/mp4" />
+            <source src="/waitingv2.mp4" type="video/mp4" />
           </video>
         ) : (
           // Fallback content when video fails
@@ -134,46 +143,71 @@ export const App = () => {
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
 
-  // Load game statistics from localStorage
-  const loadGameStats = () => {
+  // Load game statistics from server
+  const loadGameStats = async () => {
     try {
-      const savedGamesPlayed = localStorage.getItem('dumdoors_games_played');
-      const savedBestScore = localStorage.getItem('dumdoors_best_score');
+      const response = await fetch('/api/user/stats');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success') {
+          setGamesPlayed(data.stats.totalGamesPlayed || 0);
+          setBestScore(data.stats.bestScore || 0);
+          console.log('📊 Loaded user stats:', data.stats);
+        }
+      } else {
+        // Fallback to localStorage for backwards compatibility
+        const savedGamesPlayed = localStorage.getItem('dumdoors_games_played');
+        const savedBestScore = localStorage.getItem('dumdoors_best_score');
 
-      if (savedGamesPlayed) {
-        setGamesPlayed(parseInt(savedGamesPlayed, 10) || 0);
-      }
+        if (savedGamesPlayed) {
+          setGamesPlayed(parseInt(savedGamesPlayed, 10) || 0);
+        }
 
-      if (savedBestScore) {
-        setBestScore(parseInt(savedBestScore, 10) || null);
+        if (savedBestScore) {
+          setBestScore(parseInt(savedBestScore, 10) || 0);
+        }
       }
     } catch (error) {
-      console.error('Failed to load game stats:', error);
+      console.error('Error loading game stats:', error);
+      // Fallback to localStorage
+      try {
+        const savedGamesPlayed = localStorage.getItem('dumdoors_games_played');
+        const savedBestScore = localStorage.getItem('dumdoors_best_score');
+
+        if (savedGamesPlayed) {
+          setGamesPlayed(parseInt(savedGamesPlayed, 10) || 0);
+        }
+
+        if (savedBestScore) {
+          setBestScore(parseInt(savedBestScore, 10) || 0);
+        }
+      } catch (localError) {
+        console.error('Error loading from localStorage:', localError);
+      }
     }
   };
 
-  // Save game statistics to localStorage
-  const saveGameStats = (newGamesPlayed: number, newBestScore?: number) => {
-    try {
-      localStorage.setItem('dumdoors_games_played', newGamesPlayed.toString());
-
-      if (newBestScore !== undefined) {
-        const currentBest = bestScore || 0;
-        const updatedBest = Math.max(currentBest, newBestScore);
-        localStorage.setItem('dumdoors_best_score', updatedBest.toString());
-        setBestScore(updatedBest);
-      }
-
-      setGamesPlayed(newGamesPlayed);
-    } catch (error) {
-      console.error('Failed to save game stats:', error);
-    }
-  };
-
-  // Increment games played counter
-  const incrementGamesPlayed = (finalScore?: number) => {
+  // Update local stats (server stats are updated automatically via leaderboard submission)
+  const updateLocalStats = (newBestScore?: number) => {
     const newCount = gamesPlayed + 1;
-    saveGameStats(newCount, finalScore);
+    setGamesPlayed(newCount);
+    
+    if (newBestScore !== undefined) {
+      const currentBest = bestScore || 0;
+      const updatedBest = Math.max(currentBest, newBestScore);
+      setBestScore(updatedBest);
+    }
+    
+    // Also save to localStorage as backup
+    try {
+      localStorage.setItem('dumdoors_games_played', newCount.toString());
+      if (newBestScore !== undefined) {
+        const updatedBest = Math.max(bestScore || 0, newBestScore);
+        localStorage.setItem('dumdoors_best_score', updatedBest.toString());
+      }
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
   };
 
   // Load game stats on component mount
@@ -611,9 +645,9 @@ export const App = () => {
 
       setGameResults(mockResults);
 
-      // Increment games played counter with final score
+      // Update local stats with final score
       const finalScore = Math.round(averageScore * playerScores.length);
-      incrementGamesPlayed(finalScore);
+      updateLocalStats(finalScore);
 
       // Submit to leaderboard
       try {
@@ -634,6 +668,9 @@ export const App = () => {
 
           // Update hasPlayedBefore state since user just completed a game
           setHasPlayedBefore(true);
+          
+          // Refresh user stats from server to get updated totals
+          setTimeout(() => loadGameStats(), 1000);
 
           // Update user flair if we have a username
           if (username) {
@@ -1460,7 +1497,7 @@ export const App = () => {
             {/* Content */}
             <div className="flex justify-center">
               {dumStoneReport === 'generating' && (
-                <WaitingScreen />
+                <WaitingScreen onBack={handleCloseDumStones} />
               )}
 
               {dumStoneReport === 'error' && (
