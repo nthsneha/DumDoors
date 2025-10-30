@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "dumdoors",
+  "name": "dumdoors-v2",
   "version": "0.0.0",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -28,7 +28,7 @@
   "dependencies": {
     "@devvit/web": "0.12.1",
     "clsx": "2.1.1",
-    "devvit": "0.12.1",
+    "devvit": "^0.12.1",
     "express": "5.1.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

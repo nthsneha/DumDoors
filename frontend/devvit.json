@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "dumdoors",
+  "name": "dumdoors-v2",
   "permissions": {
     "http": {
       "enable": true,
