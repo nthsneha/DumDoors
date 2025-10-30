@@ -5,13 +5,14 @@ export interface ScoreResponse {
     feasibility: number;
     humor: number;
     originality: number;
+    speed_bonus?: number;
   };
   feedback?: string;
   path_recommendation: 'shorter_path' | 'normal_path' | 'longer_path';
 }
 
 class ScoringService {
-  scoreResponse(doorContent: string, response: string): ScoreResponse {
+  scoreResponse(doorContent: string, response: string, responseTimeSeconds?: number): ScoreResponse {
     const responseLength = response.trim().length;
     const words = response.toLowerCase().split(/\s+/);
     
@@ -44,7 +45,25 @@ class ScoringService {
     humor = Math.max(0, Math.min(100, humor));
     originality = Math.max(10, Math.min(100, originality));
 
-    const totalScore = (creativity + feasibility + humor + originality) / 4;
+    // Calculate speed bonus based on response time
+    let speedBonus = 0;
+    if (responseTimeSeconds !== undefined) {
+      // Optimal response time is around 30-60 seconds
+      // Too fast (< 15s) might be low quality, too slow (> 120s) gets no bonus
+      if (responseTimeSeconds >= 15 && responseTimeSeconds <= 30) {
+        speedBonus = 15; // Fast and thoughtful
+      } else if (responseTimeSeconds > 30 && responseTimeSeconds <= 60) {
+        speedBonus = 10; // Good timing
+      } else if (responseTimeSeconds > 60 && responseTimeSeconds <= 90) {
+        speedBonus = 5; // Decent timing
+      } else if (responseTimeSeconds > 90 && responseTimeSeconds <= 120) {
+        speedBonus = 2; // Slow but acceptable
+      }
+      // No bonus for < 15s (too rushed) or > 120s (too slow)
+    }
+
+    const baseScore = (creativity + feasibility + humor + originality) / 4;
+    const totalScore = Math.min(100, baseScore + speedBonus);
 
     // Determine path recommendation
     let pathRecommendation: 'shorter_path' | 'normal_path' | 'longer_path' = 'normal_path';
@@ -61,13 +80,14 @@ class ScoringService {
         feasibility,
         humor,
         originality,
+        speed_bonus: speedBonus,
       },
-      feedback: this.generateFeedback(totalScore, creativity, feasibility, humor, originality),
+      feedback: this.generateFeedback(totalScore, creativity, feasibility, humor, originality, speedBonus, responseTimeSeconds),
       path_recommendation: pathRecommendation,
     };
   }
 
-  private generateFeedback(total: number, creativity: number, feasibility: number, humor: number, originality: number): string {
+  private generateFeedback(total: number, creativity: number, feasibility: number, humor: number, originality: number, speedBonus?: number, responseTime?: number): string {
     const feedbacks = [];
 
     if (total >= 80) {
@@ -91,6 +111,23 @@ class ScoringService {
     }
     if (originality >= 80) {
       feedbacks.push("Unique and original thinking!");
+    }
+
+    // Add speed-related feedback
+    if (speedBonus && speedBonus > 0 && responseTime) {
+      if (speedBonus >= 15) {
+        feedbacks.push("Lightning fast response with great quality!");
+      } else if (speedBonus >= 10) {
+        feedbacks.push("Great timing on your response!");
+      } else if (speedBonus >= 5) {
+        feedbacks.push("Good response time!");
+      } else {
+        feedbacks.push("Nice thoughtful response!");
+      }
+    } else if (responseTime && responseTime > 120) {
+      feedbacks.push("Take your time, but try to be a bit quicker next time!");
+    } else if (responseTime && responseTime < 15) {
+      feedbacks.push("Quick response! Try adding more detail for higher scores.");
     }
 
     return feedbacks.join(" ");

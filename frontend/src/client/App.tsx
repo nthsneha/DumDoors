@@ -65,7 +65,9 @@ export const App = () => {
   });
   const [doorColor, setDoorColor] = useState<'neutral' | 'red' | 'yellow' | 'green'>('neutral');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [totalGameTime, setTotalGameTime] = useState<number>(0);
+  const [scenarioStartTime, setScenarioStartTime] = useState<number | null>(null);
   const [gameResults, setGameResults] = useState<GameResultsType | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<ScoreResponse | null>(null);
   const [playerScores, setPlayerScores] = useState<number[]>([]);
@@ -77,15 +79,15 @@ export const App = () => {
   const [dumStoneReport, setDumStoneReport] = useState<any>(null);
 
 
-  // Timer for response phase
+  // Timer for total game time
   useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0 && !isSubmitting) {
+    if (gameState === 'playing' && gameStartTime && !isSubmitting) {
       const timer = setInterval(() => {
-        setTimeLeft((prev) => Math.max(0, prev - 1));
+        setTotalGameTime(Math.floor((Date.now() - gameStartTime) / 1000));
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [gameState, timeLeft, isSubmitting]);
+  }, [gameState, gameStartTime, isSubmitting]);
 
   // Initialize first scenario when game starts
   useEffect(() => {
@@ -96,8 +98,19 @@ export const App = () => {
 
   const initializeGame = async () => {
     try {
-      // Get first scenario from CSV
-      const scenarioData = await scenarioService.getRandomScenario();
+      console.log('🎮 [GAME] Initializing game, getting first scenario...');
+      
+      // Set game start time
+      setGameStartTime(Date.now());
+      setTotalGameTime(0);
+      
+      // Get first scenario from hardcoded data
+      const scenarioData = scenarioService.getRandomScenario();
+      console.log('✅ [GAME] Got scenario data:', {
+        scenarioLength: scenarioData.scenario.length,
+        reasoningLength: scenarioData.reasoning.length,
+        preview: scenarioData.scenario.substring(0, 50) + '...'
+      });
 
       const firstScenario: GameScenario = {
         id: `scenario_${Date.now()}`,
@@ -107,9 +120,10 @@ export const App = () => {
       };
 
       setCurrentScenario(firstScenario);
-      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+      setScenarioStartTime(Date.now()); // Track when this scenario started
+      console.log('✅ [GAME] Game initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize game:', error);
+      console.error('❌ [GAME] Failed to initialize game:', error);
       handleError(error as Error, 'initialize_game');
     }
   };
@@ -126,6 +140,8 @@ export const App = () => {
     setGameState('playing');
     setDoorColor('neutral');
     setCurrentScenario(null); // Will be set by useEffect
+    setGameStartTime(null); // Will be set in initializeGame
+    setTotalGameTime(0);
   };
 
   const handleViewLeaderboard = () => {
@@ -168,6 +184,9 @@ export const App = () => {
     setWaitingForNext(false);
     setShowOutcome(false);
     setDumStoneReport(null);
+    setGameStartTime(null);
+    setTotalGameTime(0);
+    setScenarioStartTime(null);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
@@ -190,8 +209,11 @@ export const App = () => {
 
   const handleAnimationEnd = async () => {
     try {
-      // Get next scenario from CSV
-      const scenarioData = await scenarioService.getRandomScenario();
+      console.log('🚪 [GAME] Loading next scenario after door animation...');
+      
+      // Get next scenario from hardcoded data
+      const scenarioData = scenarioService.getRandomScenario();
+      console.log('✅ [GAME] Got next scenario:', scenarioData.scenario.substring(0, 50) + '...');
 
       const nextScenario: GameScenario = {
         id: `scenario_${Date.now()}`,
@@ -201,14 +223,15 @@ export const App = () => {
       };
 
       setCurrentScenario(nextScenario);
+      setScenarioStartTime(Date.now()); // Track when this new scenario started
       setDoorColor('neutral');
       setCurrentAnalysis(null);
       setShowOutcome(false);
       setWaitingForNext(false);
-      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
       setShowDoorAnimation(false);
+      console.log('✅ [GAME] Next scenario loaded successfully');
     } catch (error) {
-      console.error('Failed to load next scenario:', error);
+      console.error('❌ [GAME] Failed to load next scenario:', error);
       setShowDoorAnimation(false);
       // Fallback: keep current scenario and allow retry
     }
@@ -319,9 +342,12 @@ export const App = () => {
       } catch (geminiError) {
         console.warn('Gemini analysis failed, falling back to local scoring:', geminiError);
 
+        // Calculate response time for this scenario
+        const responseTimeSeconds = scenarioStartTime ? Math.floor((Date.now() - scenarioStartTime) / 1000) : undefined;
+        
         // Fallback to local scoring service
-        scoreResponse = scoringService.scoreResponse(currentScenario.content, response);
-        console.log('Using fallback local scoring:', scoreResponse);
+        scoreResponse = scoringService.scoreResponse(currentScenario.content, response, responseTimeSeconds);
+        console.log('Using fallback local scoring:', scoreResponse, 'Response time:', responseTimeSeconds, 's');
       }
 
       if (scoreResponse) {
@@ -373,6 +399,16 @@ export const App = () => {
       if (gamePath.currentPosition >= gamePath.totalLength - 1) {
         // Game completed - show results
         const averageScore = playerScores.reduce((a, b) => a + b, 0) / playerScores.length;
+        
+        // Format total game time
+        const formatGameTime = (seconds: number): string => {
+          const mins = Math.floor(seconds / 60);
+          const secs = seconds % 60;
+          return `${mins}m ${secs}s`;
+        };
+        
+        const gameTimeFormatted = formatGameTime(totalGameTime);
+        
         const mockResults: GameResultsType = {
           winner: 'player1',
           rankings: [
@@ -381,7 +417,7 @@ export const App = () => {
               username: username || 'You',
               position: 1,
               totalScore: Math.round(averageScore * playerScores.length),
-              completionTime: '4m 32s',
+              completionTime: gameTimeFormatted,
             },
           ],
           statistics: [
@@ -389,7 +425,7 @@ export const App = () => {
               playerId: 'player1',
               averageScore: Math.round(averageScore * 10) / 10,
               doorsCompleted: gamePath.currentPosition,
-              totalTime: '4m 32s',
+              totalTime: totalGameTime.toString(), // Store as seconds for calculations
             },
           ],
           sessionId: `demo-session-${Date.now()}`,
@@ -778,18 +814,12 @@ export const App = () => {
                 </button>
 
                 {/* Game Info */}
-                <div className="bg-black/40 backdrop-blur-lg rounded-xl p-3 border border-white/20">
-                  <h3 className="text-white font-semibold text-sm mb-2">🎮 Game Info</h3>
-                  <div className="space-y-1 text-xs">
-                    <div className="flex gap-1 text-gray-300">
-                      <span>Door:</span>
-                      <span className="text-white">
-                        {gamePath.currentPosition + 1}/{gamePath.totalLength}
-                      </span>
-                    </div>
-                    <div className="flex gap-1 text-gray-300">
-                      <span>Time:</span>
-                      <span className="text-white">{timeLeft}s</span>
+                <div className="bg-black/40 backdrop-blur-lg rounded-xl p-4 border border-white/20">
+                  <h3 className="text-white font-semibold text-lg mb-3">🎮 Game Info</h3>
+                  <div className="space-y-2">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-gray-300 text-sm">Total Time:</span>
+                      <span className="text-white font-bold text-2xl font-mono">{Math.floor(totalGameTime / 60)}:{(totalGameTime % 60).toString().padStart(2, '0')}</span>
                     </div>
                   </div>
                 </div>
@@ -820,10 +850,10 @@ export const App = () => {
               </button>
 
               {/* Mobile Game Info */}
-              <div className="bg-black/40 backdrop-blur-lg rounded-lg p-2 border border-white/20 flex-1">
-                <div className="flex justify-between text-xs text-white">
-                  <span>Door: {gamePath.currentPosition + 1}/{gamePath.totalLength}</span>
-                  <span>Time: {timeLeft}s</span>
+              <div className="bg-black/40 backdrop-blur-lg rounded-lg p-3 border border-white/20 flex-1">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-gray-300 text-xs">Total Time:</span>
+                  <span className="text-white font-bold text-lg font-mono">{Math.floor(totalGameTime / 60)}:{(totalGameTime % 60).toString().padStart(2, '0')}</span>
                 </div>
               </div>
             </div>
@@ -987,7 +1017,6 @@ export const App = () => {
                         <div className="flex-1">
                           <VoiceResponseInput
                             onSubmit={handleSubmitResponse}
-                            timeLeft={timeLeft}
                             maxLength={CONFIG.GAME.MAX_RESPONSE_LENGTH}
                             placeholder="Describe what you would do in this situation..."
                             disabled={isSubmitting || !currentScenario || waitingForNext}
@@ -1176,6 +1205,9 @@ export const App = () => {
                 setDoorColor('neutral');
                 setShowOutcome(false);
                 setWaitingForNext(false);
+                setGameStartTime(null);
+                setTotalGameTime(0);
+                setScenarioStartTime(null);
                 setGamePath({
                   nodes: [
                     { id: 'start', position: 0, type: 'start', status: 'completed' },

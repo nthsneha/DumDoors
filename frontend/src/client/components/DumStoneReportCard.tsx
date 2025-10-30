@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface DumStoneReport {
   title: string;
@@ -17,13 +17,46 @@ interface DumStoneReportCardProps {
   onCopyRoast: () => void;
 }
 
+// Fallback Pumpkin Component with Error Handling
+const PumpkinDecoration: React.FC<{ style: React.CSSProperties }> = ({ style }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (imageError) {
+    // Fallback to emoji pumpkin with better styling
+    return (
+      <div
+        className="absolute w-80 h-80 opacity-40 animate-float flex items-center justify-center"
+        style={style}
+      >
+        <span className="text-9xl drop-shadow-lg" style={{ filter: 'sepia(1) hue-rotate(15deg) saturate(2)' }}>🎃</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src="/pumpkin.svg"
+      alt=""
+      className="absolute w-80 h-80 opacity-40 animate-float"
+      style={style}
+      onError={() => {
+        console.log('🎃 Pumpkin SVG failed to load, using emoji fallback');
+        setImageError(true);
+      }}
+      onLoad={() => {
+        console.log('🎃 Pumpkin SVG loaded successfully');
+      }}
+    />
+  );
+};
+
 export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
   report,
   onClose,
   onCopyRoast,
 }) => {
   return (
-   <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-950 to-gray-900 flex items-center justify-center p-4 overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-950 to-gray-900 flex items-center justify-center p-4 overflow-hidden">
       <button
         onClick={onClose}
         className="fixed top-4 right-4 bg-black/70 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center transition-colors z-50 border-2 border-white/20 backdrop-blur-sm"
@@ -94,11 +127,11 @@ export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
             {/* Decorative Line */}
             <div className="w-16 h-0.5 bg-gray-700 mb-4 shadow-inner"></div>
 
-            {/* Dates (Parody) */}
+            {/* Dates (Parody)
             <div className="text-engraved text-gray-800 text-xs leading-relaxed mb-4">
               <div>Born: Optimistic</div>
               <div>Died: Disappointed</div>
-            </div>
+            </div> */}
 
             {/* Bottom Decoration */}
             <div className="text-2xl animate-float mt-auto">💀</div>
@@ -109,7 +142,7 @@ export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
         {/*<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 bg-gradient-to-b from-gray-500 to-gray-700 h-6 w-3/4 max-w-xs rounded-b-lg border-x-4 border-b-4 border-gray-500 shadow-lg"></div>*/}
 
         {/* Ground/Grass Effect */}
-       {/*<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-4 w-full h-3 bg-gradient-to-r from-green-800 via-green-700 to-green-800 rounded-full opacity-60"></div>*/}
+        {/*<div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-4 w-full h-3 bg-gradient-to-r from-green-800 via-green-700 to-green-800 rounded-full opacity-60"></div>*/}
         {/* Small Decorations */}
         {/*<div
           className="absolute bottom-2 left-1/4 text-sm animate-float"
@@ -126,8 +159,8 @@ export const DumStoneReportCard: React.FC<DumStoneReportCardProps> = ({
         */}
 
         {/* Massive Pumpkins Flanking the Tombstone */}
-        <img src="/pumpkin.svg" alt="" className="absolute w-80 h-80 opacity-40 animate-float" style={{ top: '45%', left: '-70%' }} />
-        <img src="/pumpkin.svg" alt="" className="absolute w-80 h-80 opacity-40 animate-float" style={{ top: '45%', left: '105%' }} />
+        <PumpkinDecoration style={{ top: '45%', left: '-70%' }} />
+        <PumpkinDecoration style={{ top: '45%', left: '105%' }} />
       </div>
     </div>
   );

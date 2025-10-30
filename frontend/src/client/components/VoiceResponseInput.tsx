@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 
 interface VoiceResponseInputProps {
   onSubmit: (response: string) => void;
-  timeLeft: number;
   maxLength?: number;
   placeholder?: string;
   disabled?: boolean;
@@ -11,7 +10,6 @@ interface VoiceResponseInputProps {
 
 export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
   onSubmit,
-  timeLeft,
   maxLength = 500,
   placeholder = "Describe what you would do...",
   disabled = false,
@@ -300,27 +298,14 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
-  const getTimeColor = () => {
-    if (timeLeft <= 10) return 'text-red-400';
-    if (timeLeft <= 30) return 'text-yellow-400';
-    return 'text-green-400';
-  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 relative z-50" style={{ position: 'relative', zIndex: 50 }}>
-      {/* Timer */}
-      <div className="flex justify-between items-center">
+      {/* Character Counter */}
+      <div className="flex justify-end items-center">
         <div className="text-sm text-gray-300">
           Character count: {response.length}/{maxLength}
-        </div>
-        <div className={`text-lg font-mono font-bold ${getTimeColor()}`}>
-          ⏱️ {formatTime(timeLeft)}
         </div>
       </div>
 
@@ -332,7 +317,7 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
             value={response}
             onChange={(e) => setResponse(e.target.value.slice(0, maxLength))}
             placeholder={placeholder}
-            disabled={disabled || timeLeft === 0}
+            disabled={disabled}
             className="w-full min-h-[120px] max-h-[300px] p-4 bg-white/20 border-2 border-white/40 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ 
               fontSize: '16px', 
@@ -350,7 +335,7 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
           <button
             type="button"
             onClick={handleVoiceInput}
-            disabled={disabled || timeLeft === 0}
+            disabled={disabled}
             className={`flex-shrink-0 p-4 rounded-full transition-all duration-300 transform ${
               isListening 
                 ? 'bg-red-500 hover:bg-red-600 animate-pulse scale-110 shadow-red-500/50' 
@@ -388,10 +373,10 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={!response.trim() || disabled || timeLeft === 0}
+        disabled={!response.trim() || disabled}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
       >
-        {timeLeft === 0 ? 'Time\'s Up!' : 'Submit Response'}
+        Submit Response
       </button>
 
       {/* Debug Info */}
