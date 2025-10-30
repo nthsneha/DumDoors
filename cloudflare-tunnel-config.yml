@@ -1,7 +1,0 @@
-tunnel: dumdoors-backend
-credentials-file: /home/sksai/.cloudflared/[TUNNEL-ID].json
-
-ingress:
-  - hostname: api.dumdoors.tech
-    service: http://localhost:8080
-  - service: http_status:404
