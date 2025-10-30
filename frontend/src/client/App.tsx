@@ -131,6 +131,7 @@ export const App = () => {
   const [hasPlayedBefore, setHasPlayedBefore] = useState<boolean>(false);
   const [gamesPlayed, setGamesPlayed] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
 
   // Load game statistics from localStorage
   const loadGameStats = () => {
@@ -189,6 +190,23 @@ export const App = () => {
     }
   }, [gameState, gameStartTime, isSubmitting]);
 
+  // Timer for response phase (30 seconds per scenario)
+  useEffect(() => {
+    if (gameState === 'playing' && timeLeft > 0 && !isSubmitting && !waitingForNext && !showOutcome && currentScenario) {
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            // Time's up! Auto-submit empty response
+            handleSubmitResponse('');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [gameState, timeLeft, isSubmitting, waitingForNext, showOutcome, currentScenario]);
+
   // Initialize first scenario when game starts
   useEffect(() => {
     if (gameState === 'playing' && !currentScenario) {
@@ -240,6 +258,7 @@ export const App = () => {
       };
 
       setCurrentScenario(firstScenario);
+      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
       setScenarioStartTime(Date.now()); // Track when this scenario started
       console.log('✅ [GAME] Game initialized successfully');
     } catch (error) {
@@ -325,6 +344,7 @@ export const App = () => {
     setGameStartTime(null);
     setTotalGameTime(0);
     setScenarioStartTime(null);
+    setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
     setGamePath({
       nodes: [
         { id: 'start', position: 0, type: 'start', status: 'completed' },
@@ -362,6 +382,7 @@ export const App = () => {
 
       setCurrentScenario(nextScenario);
       setScenarioStartTime(Date.now()); // Track when this new scenario started
+      setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT); // Reset timer for new scenario
       setDoorColor('neutral');
       setCurrentAnalysis(null);
       setShowOutcome(false);
@@ -1166,6 +1187,7 @@ export const App = () => {
                         <div className="flex-1">
                           <VoiceResponseInput
                             onSubmit={handleSubmitResponse}
+                            timeLeft={timeLeft}
                             maxLength={CONFIG.GAME.MAX_RESPONSE_LENGTH}
                             placeholder="Describe what you would do in this situation..."
                             disabled={isSubmitting || !currentScenario || waitingForNext}

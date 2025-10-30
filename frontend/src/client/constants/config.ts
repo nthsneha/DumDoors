@@ -7,7 +7,7 @@ export const CONFIG = {
 
   // Game configuration
   GAME: {
-    DEFAULT_TIME_LIMIT: 40, // seconds
+    DEFAULT_TIME_LIMIT: 30, // seconds
     MAX_RESPONSE_LENGTH: 500,
     DEFAULT_PATH_LENGTH: 3,
     MIN_PATH_LENGTH: 1,
