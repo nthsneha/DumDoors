@@ -79,6 +79,11 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+scripts/
+tmp/
+tools/
+logs/
+config/
 
 # Virtual environments
 .env
@@ -123,3 +128,5 @@ docker-compose.override.yml
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+devvit.yaml
