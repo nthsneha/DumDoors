@@ -77,6 +77,7 @@ export const App = () => {
   const [showMobileMap, setShowMobileMap] = useState(false);
   const [gameResponses, setGameResponses] = useState<Array<{ scenario: string, response: string, score: number }>>([]);
   const [dumStoneReport, setDumStoneReport] = useState<any>(null);
+  const [hasPlayedBefore, setHasPlayedBefore] = useState<boolean>(false);
 
 
   // Timer for total game time
@@ -95,6 +96,26 @@ export const App = () => {
       initializeGame();
     }
   }, [gameState, currentScenario]);
+
+  // Check if user has played before (for DumStone availability)
+  useEffect(() => {
+    const checkUserPlayHistory = async () => {
+      try {
+        const response = await fetch('/api/user/has-played');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success') {
+            setHasPlayedBefore(data.hasPlayed);
+            console.log('🃏 [DEBUG] User has played before:', data.hasPlayed);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user play history:', error);
+      }
+    };
+
+    checkUserPlayHistory();
+  }, []);
 
   const initializeGame = async () => {
     try {
@@ -149,23 +170,41 @@ export const App = () => {
   };
 
   const handleViewDumStones = async () => {
-    console.log('🃏 [DEBUG] handleViewDumStones called, gameResponses.length:', gameResponses.length);
-    if (gameResponses.length > 0) {
-      try {
-        console.log('🃏 [DEBUG] Setting loading state and navigating to dumstones page');
-        setDumStoneReport('generating'); // Show loading state
-        setGameState('dumstones');
+    console.log('🃏 [DEBUG] handleViewDumStones called');
+    
+    try {
+      setDumStoneReport('generating'); // Show loading state
+      setGameState('dumstones');
 
-        console.log('🃏 [DEBUG] Generating report...');
-        const report = await dumStonesService.generateReport(gameResponses);
-        console.log('🃏 [DEBUG] Report generated:', report);
-        setDumStoneReport(report);
-      } catch (error) {
-        console.error('Failed to generate Dum-Stones report:', error);
-        setDumStoneReport('error');
+      let responsesToUse = gameResponses;
+
+      // If no current game responses, try to fetch from server
+      if (responsesToUse.length === 0) {
+        console.log('🃏 [DEBUG] No current game responses, fetching from server...');
+        const response = await fetch('/api/user/responses');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success' && data.responses) {
+            responsesToUse = data.responses;
+            console.log('🃏 [DEBUG] Fetched responses from server:', responsesToUse.length);
+          }
+        }
       }
-    } else {
-      console.log('🃏 [DEBUG] No game responses available');
+
+      if (responsesToUse.length === 0) {
+        console.log('🃏 [DEBUG] No responses available for DumStone generation');
+        setDumStoneReport('error');
+        return;
+      }
+
+      console.log('🃏 [DEBUG] Generating report with responses:', responsesToUse.length);
+      const report = await dumStonesService.generateReport(responsesToUse);
+      console.log('🃏 [DEBUG] Report generated:', report);
+      setDumStoneReport(report);
+    } catch (error) {
+      console.error('Failed to generate Dum-Stones report:', error);
+      setDumStoneReport('error');
     }
   };
 
@@ -445,11 +484,15 @@ export const App = () => {
             },
             body: JSON.stringify({
               gameResults: mockResults,
+              gameResponses: gameResponses, // Include game responses for DumStone
             }),
           });
 
           if (response.ok) {
             console.log('✅ Game results submitted to leaderboard successfully');
+            
+            // Update hasPlayedBefore state since user just completed a game
+            setHasPlayedBefore(true);
 
             // Update user flair if we have a username
             if (username) {
@@ -676,21 +719,21 @@ export const App = () => {
                   </div>
                 </button>
 
-                {/* DumStone Button - Always visible, locked until first game played */}
+                {/* DumStone Button - Available if user has played before or has current responses */}
                 <button
-                  onClick={gameResponses.length > 0 ? handleViewDumStones : undefined}
-                  disabled={gameResponses.length === 0}
+                  onClick={(gameResponses.length > 0 || hasPlayedBefore) ? handleViewDumStones : undefined}
+                  disabled={gameResponses.length === 0 && !hasPlayedBefore}
                   className={`px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg transition-all duration-200 shadow-2xl border-2 ${
-                    gameResponses.length > 0
+                    (gameResponses.length > 0 || hasPlayedBefore)
                       ? 'bg-gradient-to-r from-pink-600/90 via-rose-600/90 to-red-500/90 backdrop-blur-sm text-white hover:from-pink-700/90 hover:via-rose-700/90 hover:to-red-600/90 transform hover:scale-105 border-pink-400/40 hover:border-pink-300/60 hover:shadow-pink-500/25 cursor-pointer'
                       : 'bg-gradient-to-r from-gray-600/50 via-gray-700/50 to-gray-800/50 backdrop-blur-sm text-gray-400 border-gray-500/40 cursor-not-allowed opacity-60'
                   }`}
-                  title={gameResponses.length === 0 ? 'Play at least one game to unlock your DumStone' : 'View your DumStone'}
+                  title={(gameResponses.length === 0 && !hasPlayedBefore) ? 'Play at least one game to unlock your DumStone' : 'View your DumStone'}
                 >
                   <div className="flex items-center justify-center gap-2 md:gap-3">
                     <span className="text-xl md:text-2xl">🪦</span>
                     <span>DumStone</span>
-                    {gameResponses.length === 0 && (
+                    {(gameResponses.length === 0 && !hasPlayedBefore) && (
                       <span className="text-lg">🔒</span>
                     )}
                   </div>

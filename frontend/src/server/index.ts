@@ -808,12 +808,90 @@ router.get('/api/leaderboard/stats', async (req, res): Promise<void> => {
   }
 });
 
+// Check if user has played before (for DumStone availability)
+router.get('/api/user/has-played', async (req, res): Promise<void> => {
+  try {
+    // Get current Reddit user ID
+    let redditUserId;
+    try {
+      const currentUser = await reddit.getCurrentUser();
+      redditUserId = currentUser?.id;
+    } catch (error) {
+      console.warn('Could not get current Reddit user:', error);
+    }
+
+    if (!redditUserId) {
+      res.json({
+        status: 'success',
+        hasPlayed: false,
+      });
+      return;
+    }
+
+    const hasPlayed = await leaderboardService.hasUserPlayedBefore(redditUserId);
+
+    res.json({
+      status: 'success',
+      hasPlayed,
+    });
+  } catch (error) {
+    console.error('Error checking user play history:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to check user play history',
+    });
+  }
+});
+
+// Get user responses for DumStone generation
+router.get('/api/user/responses', async (req, res): Promise<void> => {
+  try {
+    // Get current Reddit user ID
+    let redditUserId;
+    try {
+      const currentUser = await reddit.getCurrentUser();
+      redditUserId = currentUser?.id;
+    } catch (error) {
+      console.warn('Could not get current Reddit user:', error);
+    }
+
+    if (!redditUserId) {
+      res.status(401).json({
+        status: 'error',
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    const responses = await leaderboardService.getUserResponses(redditUserId);
+
+    if (!responses) {
+      res.status(404).json({
+        status: 'error',
+        message: 'No game responses found for user',
+      });
+      return;
+    }
+
+    res.json({
+      status: 'success',
+      responses,
+    });
+  } catch (error) {
+    console.error('Error getting user responses:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get user responses',
+    });
+  }
+});
+
 // Submit game results to leaderboard
 router.post('/api/leaderboard/submit', async (req, res): Promise<void> => {
   try {
     console.log('🎮 [SERVER DEBUG] Submitting game result to leaderboard');
 
-    const { gameResults } = req.body;
+    const { gameResults, gameResponses } = req.body;
 
     if (!gameResults) {
       res.status(400).json({
@@ -832,7 +910,7 @@ router.post('/api/leaderboard/submit', async (req, res): Promise<void> => {
       console.warn('Could not get current Reddit user:', error);
     }
 
-    await leaderboardService.submitGameResult(gameResults, redditUserId);
+    await leaderboardService.submitGameResult(gameResults, redditUserId, gameResponses);
 
     console.log('✅ [SERVER DEBUG] Game result submitted successfully');
     res.json({
