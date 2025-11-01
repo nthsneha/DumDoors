@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 interface VoiceResponseInputProps {
-  onSubmit: (response: string) => void;
-  timeLeft?: number;
+  onSubmit: (response: string) => void | Promise<void>;
+  timeLeft?: number | undefined;
   maxLength?: number;
   placeholder?: string;
   disabled?: boolean;
@@ -20,6 +20,7 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
   const [response, setResponse] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -125,6 +126,64 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
     }
   }, [autoFocus]);
 
+  // Detect virtual keyboard on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      // Check if viewport height has significantly decreased (keyboard opened)
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const screenHeight = window.screen.height;
+      const heightRatio = viewportHeight / screenHeight;
+      
+      // If viewport is less than 75% of screen height, assume keyboard is open
+      setIsKeyboardOpen(heightRatio < 0.75);
+    };
+
+    const handleFocus = () => {
+      // Small delay to allow keyboard to appear
+      setTimeout(() => {
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const screenHeight = window.screen.height;
+        const heightRatio = viewportHeight / screenHeight;
+        setIsKeyboardOpen(heightRatio < 0.75);
+      }, 300);
+    };
+
+    const handleBlur = () => {
+      // Small delay to allow keyboard to disappear
+      setTimeout(() => {
+        setIsKeyboardOpen(false);
+      }, 300);
+    };
+
+    // Listen for viewport changes (better for modern browsers)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    } else {
+      // Fallback for older browsers
+      window.addEventListener('resize', handleResize);
+    }
+
+    // Listen for focus/blur on textarea
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('focus', handleFocus);
+      textarea.addEventListener('blur', handleBlur);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      } else {
+        window.removeEventListener('resize', handleResize);
+      }
+      
+      if (textarea) {
+        textarea.removeEventListener('focus', handleFocus);
+        textarea.removeEventListener('blur', handleBlur);
+      }
+    };
+  }, []);
+
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -132,6 +191,19 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [response]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'Enter' && response.trim() && !disabled) {
+        e.preventDefault();
+        handleSubmit(e as any);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [response, disabled]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,9 +375,9 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
 
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 relative z-50" style={{ position: 'relative', zIndex: 50 }}>
-      {/* Timer and Character Counter */}
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col h-full relative z-50" style={{ position: 'relative', zIndex: 50 }}>
+      {/* Top Section - Timer and Character Counter */}
+      <div className="flex justify-between items-center mb-4">
         {/* Timer Display */}
         {timeLeft !== undefined && (
           <div className={`text-sm font-bold ${
@@ -325,8 +397,13 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         </div>
       </div>
 
-      {/* Input Area with External Mic Button */}
-      <div className="flex gap-3 items-start">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+
+        {/* Input Area with External Mic Button */}
+        <div className={`flex gap-3 items-start mb-4 flex-1 ${
+          isKeyboardOpen ? 'mb-2' : 'mb-4'
+        }`}>
         <div className="flex-1 relative z-50" style={{ position: 'relative', zIndex: 50 }}>
           <textarea
             ref={textareaRef}
@@ -334,7 +411,11 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
             onChange={(e) => setResponse(e.target.value.slice(0, maxLength))}
             placeholder={placeholder}
             disabled={disabled}
-            className="w-full min-h-[120px] max-h-[300px] p-4 bg-white/20 border-2 border-white/40 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full p-4 bg-white/20 border-2 border-white/40 rounded-lg text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed ${
+              isKeyboardOpen 
+                ? 'min-h-[80px] max-h-[120px]' // Smaller when keyboard is open
+                : 'min-h-[120px] max-h-[300px]' // Normal size when keyboard is closed
+            }`}
             style={{ 
               fontSize: '16px', 
               pointerEvents: 'auto', 
@@ -378,32 +459,43 @@ export const VoiceResponseInput: React.FC<VoiceResponseInputProps> = ({
         )}
       </div>
 
-      {/* Voice Status */}
-      {isListening && (
-        <div className="flex items-center gap-2 text-red-400 text-sm animate-pulse">
-          <div className="w-2 h-2 bg-red-400 rounded-full animate-ping"></div>
-          Listening... Speak your response
-        </div>
-      )}
-
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={!response.trim() || disabled}
-        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
-      >
-        Submit Response
-      </button>
-
-      {/* Debug Info */}
-      <div className="text-xs text-gray-400 text-center space-y-1">
-        <div>Press Ctrl+Enter to submit • {getVoiceInputStatus()}</div>
-        {getBrowserInfo() === 'Firefox' && !speechSupported && (
-          <div className="text-yellow-400">
-            Firefox users: Enable speech recognition in about:config → media.webspeech.recognition.enable
+        {/* Voice Status */}
+        {isListening && (
+          <div className="flex items-center gap-2 text-red-400 text-sm animate-pulse mb-4">
+            <div className="w-2 h-2 bg-red-400 rounded-full animate-ping"></div>
+            Listening... Speak your response
           </div>
         )}
       </div>
-    </form>
+
+      {/* Bottom Section - Submit Button (Adaptive positioning) */}
+      <div className="mt-auto">
+        <form onSubmit={handleSubmit}>
+          <button
+            type="submit"
+            disabled={!response.trim() || disabled}
+            className={`w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 md:py-4 px-4 md:px-6 rounded-lg font-semibold text-base md:text-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100 ${
+              isKeyboardOpen 
+                ? 'static w-full' // When keyboard is open, use normal flow
+                : 'md:static md:w-full fixed bottom-4 left-1/2 transform md:transform-none -translate-x-1/2 md:translate-x-0 w-[calc(100%-2rem)] max-w-md' // When keyboard is closed, use fixed positioning
+            } z-50`}
+          >
+            Submit Response
+          </button>
+        </form>
+
+        {/* Debug Info - Adaptive spacing */}
+        <div className={`text-xs text-gray-400 text-center space-y-1 mt-2 ${
+          isKeyboardOpen ? 'mb-2' : 'mb-16 md:mb-2'
+        }`}>
+          <div>Press Ctrl+Enter to submit • {getVoiceInputStatus()}</div>
+          {getBrowserInfo() === 'Firefox' && !speechSupported && (
+            <div className="text-yellow-400">
+              Firefox users: Enable speech recognition in about:config → media.webspeech.recognition.enable
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };

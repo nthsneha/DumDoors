@@ -1,4 +1,4 @@
-import { SCENARIOS, type ScenarioData } from '../data/scenarios';
+import { HALLOWEEN_SCENARIOS, type ScenarioData } from '../data/halloweenScenarios';
 
 class ScenarioService {
   private scenarios: ScenarioData[] = [];
@@ -25,8 +25,8 @@ class ScenarioService {
 
     console.log('🔄 [SCENARIO] Loading hardcoded scenarios...');
 
-    // Use the hardcoded scenarios directly
-    this.scenarios = SCENARIOS;
+    // Use the hardcoded Halloween scenarios directly
+    this.scenarios = HALLOWEEN_SCENARIOS;
 
     // Shuffle scenarios to randomize order
     this.shuffledScenarios = this.shuffleArray([...this.scenarios]);

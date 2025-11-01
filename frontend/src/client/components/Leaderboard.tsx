@@ -167,13 +167,13 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
 
   return (
     <div className={`bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 ${className}`}>
-      {/* Header */}
-      <div className="p-6 border-b border-white/20">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            🏆 Global Leaderboard
+      {/* Header - Mobile Responsive */}
+      <div className="p-3 md:p-6 border-b border-white/20">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <h2 className="text-lg md:text-2xl font-bold text-white flex items-center gap-1 md:gap-2">
+            🏆 <span className="hidden sm:inline">Global </span>Leaderboard
           </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-1 md:gap-2">
             <button
               onClick={async () => {
                 try {
@@ -192,14 +192,15 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
                   alert('Failed to post to Reddit');
                 }
               }}
-              className="text-white/60 hover:text-white transition-colors text-sm bg-orange-500/20 px-2 py-1 rounded"
+              className="text-white/60 hover:text-white transition-colors text-xs md:text-sm bg-orange-500/20 px-1 md:px-2 py-1 rounded"
               title="Post daily leaderboard to Reddit"
             >
-              📅 Post to Reddit
+              <span className="hidden sm:inline">📅 Post to Reddit</span>
+              <span className="sm:hidden">📅</span>
             </button>
             <button
               onClick={fetchLeaderboard}
-              className="text-white/60 hover:text-white transition-colors"
+              className="text-white/60 hover:text-white transition-colors text-sm md:text-base"
               title="Refresh leaderboard"
             >
               🔄
@@ -207,115 +208,116 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
           </div>
         </div>
 
-        {/* Stats Summary */}
+        {/* Stats Summary - Mobile Responsive */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
-              <div className="text-3xl font-black text-blue-400">{stats.totalGamesCompleted}</div>
-              <div className="text-sm text-white/70 font-medium">Games Completed</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">
+            <div className="bg-white/10 rounded-lg md:rounded-xl p-2 md:p-4 text-center border border-white/20">
+              <div className="text-xl md:text-3xl font-black text-blue-400">{stats.totalGamesCompleted}</div>
+              <div className="text-xs md:text-sm text-white/70 font-medium">Games</div>
             </div>
-            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
-              <div className="text-3xl font-black text-green-400">{formatTime(stats.fastestEverTime)}</div>
-              <div className="text-sm text-white/70 font-medium">Fastest Time</div>
+            <div className="bg-white/10 rounded-lg md:rounded-xl p-2 md:p-4 text-center border border-white/20">
+              <div className="text-xl md:text-3xl font-black text-green-400">{formatTime(stats.fastestEverTime)}</div>
+              <div className="text-xs md:text-sm text-white/70 font-medium">Fastest</div>
             </div>
-            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
-              <div className="text-3xl font-black text-yellow-400">{formatScore(stats.highestEverAverage)}</div>
-              <div className="text-sm text-white/70 font-medium">Highest Average</div>
+            <div className="bg-white/10 rounded-lg md:rounded-xl p-2 md:p-4 text-center border border-white/20">
+              <div className="text-xl md:text-3xl font-black text-yellow-400">{formatScore(stats.highestEverAverage)}</div>
+              <div className="text-xs md:text-sm text-white/70 font-medium">Highest</div>
             </div>
-            <div className="bg-white/10 rounded-xl p-4 text-center border border-white/20">
-              <div className="text-3xl font-black text-blue-400">{formatTime(stats.averageCompletionTime)}</div>
-              <div className="text-sm text-white/70 font-medium">Avg. Time</div>
+            <div className="bg-white/10 rounded-lg md:rounded-xl p-2 md:p-4 text-center border border-white/20">
+              <div className="text-xl md:text-3xl font-black text-blue-400">{formatTime(stats.averageCompletionTime)}</div>
+              <div className="text-xs md:text-sm text-white/70 font-medium">Avg. Time</div>
             </div>
           </div>
         )}
 
-        {/* Category Tabs */}
-        <div className="flex flex-wrap gap-2">
+        {/* Category Tabs - Mobile Responsive */}
+        <div className="flex flex-wrap gap-1 md:gap-2">
           {(['fastest', 'highest', 'most', 'recent'] as LeaderboardCategory[]).map((category) => {
             const info = getCategoryInfo(category);
             return (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                className={`px-2 md:px-4 py-1 md:py-2 rounded-lg font-medium transition-all text-xs md:text-sm ${
                   activeCategory === category
                     ? 'bg-blue-600 text-white shadow-lg'
                     : 'bg-white/10 text-white/80 hover:bg-white/20'
                 }`}
               >
                 <span className="mr-1">{info.icon}</span>
-                {info.title.replace(/^[^\s]+ /, '')}
+                <span className="hidden sm:inline">{info.title.replace(/^[^\s]+ /, '')}</span>
+                <span className="sm:hidden">{info.title.replace(/^[^\s]+ /, '').split(' ')[0]}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="p-4 border-b border-white/20 bg-white/5">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-white/80 text-sm">Mode:</label>
+      {/* Filters - Mobile Responsive */}
+      <div className="p-2 md:p-4 border-b border-white/20 bg-white/5">
+        <div className="flex flex-col sm:flex-row gap-2 md:gap-4 items-start sm:items-center">
+          <div className="flex items-center gap-1 md:gap-2">
+            <label className="text-white/80 text-xs md:text-sm">Mode:</label>
             <select
               value={filter.gameMode || ''}
               onChange={(e) => setFilter(prev => ({ 
                 ...prev, 
                 gameMode: e.target.value as GameMode || undefined 
               }))}
-              className="bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm"
+              className="bg-white/10 border border-white/20 rounded px-1 md:px-2 py-1 text-white text-xs md:text-sm"
             >
-              <option value="">All Modes</option>
-              <option value="multiplayer">Multiplayer</option>
-              <option value="single-player">Single Player</option>
+              <option value="">All</option>
+              <option value="multiplayer">Multi</option>
+              <option value="single-player">Solo</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-white/80 text-sm">Time:</label>
+          <div className="flex items-center gap-1 md:gap-2">
+            <label className="text-white/80 text-xs md:text-sm">Time:</label>
             <select
               value={filter.timeRange || 'all'}
               onChange={(e) => setFilter(prev => ({ 
                 ...prev, 
                 timeRange: e.target.value as any 
               }))}
-              className="bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm"
+              className="bg-white/10 border border-white/20 rounded px-1 md:px-2 py-1 text-white text-xs md:text-sm"
             >
               <option value="all">All Time</option>
-              <option value="month">This Month</option>
-              <option value="week">This Week</option>
+              <option value="month">Month</option>
+              <option value="week">Week</option>
               <option value="day">Today</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Category Header */}
-      <div className="p-4 bg-gradient-to-r from-blue-600/20 to-blue-500/20">
-        <h3 className="text-lg font-semibold text-white mb-1">{categoryInfo.title}</h3>
-        <p className="text-white/70 text-sm">{categoryInfo.description}</p>
+      {/* Category Header - Mobile Responsive */}
+      <div className="p-3 md:p-4 bg-gradient-to-r from-blue-600/20 to-blue-500/20">
+        <h3 className="text-base md:text-lg font-semibold text-white mb-1">{categoryInfo.title}</h3>
+        <p className="text-white/70 text-xs md:text-sm">{categoryInfo.description}</p>
       </div>
 
-      {/* Leaderboard List */}
-      <div className="p-4">
+      {/* Leaderboard List - Mobile Responsive */}
+      <div className="p-2 md:p-4">
         {categoryData.length === 0 ? (
-          <div className="text-center py-8 text-white/60">
-            <div className="text-4xl mb-2">🏆</div>
-            <p>No entries found for this category</p>
+          <div className="text-center py-6 md:py-8 text-white/60">
+            <div className="text-3xl md:text-4xl mb-2">🏆</div>
+            <p className="text-sm md:text-base">No entries found for this category</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {categoryData.map((entry, index) => (
               <div
                 key={entry.id}
-                className={`flex items-center justify-between p-4 rounded-xl transition-all hover:bg-white/15 border ${
+                className={`flex items-center justify-between p-2 md:p-4 rounded-lg md:rounded-xl transition-all hover:bg-white/15 border ${
                   index === 0 ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/40 shadow-lg' :
                   index === 1 ? 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-gray-400/40 shadow-lg' :
                   index === 2 ? 'bg-gradient-to-r from-amber-600/20 to-amber-700/20 border-amber-600/40 shadow-lg' :
                   'bg-white/10 border-white/20'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg ${
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-sm md:text-lg flex-shrink-0 ${
                     index === 0 ? 'bg-yellow-500 text-yellow-900 shadow-lg' :
                     index === 1 ? 'bg-gray-400 text-gray-900 shadow-lg' :
                     index === 2 ? 'bg-amber-600 text-amber-900 shadow-lg' :
@@ -324,47 +326,51 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
                     {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
                   </div>
                   
-                  <div>
-                    <div className="font-semibold text-white">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-white text-sm md:text-base truncate">
                       u/{entry.username}
                       {entry.redditUserId && (
-                        <span className="ml-2 text-xs bg-orange-500/30 text-orange-200 px-2 py-0.5 rounded">
-                          🤖 Reddit
+                        <span className="ml-1 md:ml-2 text-xs bg-orange-500/30 text-orange-200 px-1 md:px-2 py-0.5 rounded">
+                          <span className="hidden sm:inline">🤖 Reddit</span>
+                          <span className="sm:hidden">🤖</span>
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-white/60 flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
+                    <div className="text-xs text-white/60 flex items-center gap-1 md:gap-2 flex-wrap">
+                      <span className={`px-1 md:px-2 py-0.5 rounded text-xs ${
                         entry.gameMode === 'multiplayer' 
                           ? 'bg-blue-500/30 text-blue-200' 
                           : 'bg-green-500/30 text-green-200'
                       }`}>
-                        {entry.gameMode === 'multiplayer' ? '👥 Multi' : '👤 Solo'}
+                        <span className="hidden sm:inline">{entry.gameMode === 'multiplayer' ? '👥 Multi' : '👤 Solo'}</span>
+                        <span className="sm:hidden">{entry.gameMode === 'multiplayer' ? '👥' : '👤'}</span>
                       </span>
                       {entry.theme && (
-                        <span className="bg-blue-500/30 text-blue-200 px-2 py-0.5 rounded text-xs">
+                        <span className="bg-blue-500/30 text-blue-200 px-1 md:px-2 py-0.5 rounded text-xs hidden sm:inline">
                           {entry.theme}
                         </span>
                       )}
-                      <span className="text-white/40">
+                      <span className="text-white/40 hidden sm:inline">
                         {new Date(entry.completedAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="font-black text-xl text-white">
+                <div className="text-right flex-shrink-0">
+                  <div className="font-black text-base md:text-xl text-white">
                     {activeCategory === 'fastest' && formatTime(entry.completionTime)}
                     {activeCategory === 'highest' && formatScore(entry.averageScore)}
-                    {activeCategory === 'most' && `${entry.doorsCompleted} doors`}
+                    {activeCategory === 'most' && `${entry.doorsCompleted}`}
                     {activeCategory === 'recent' && formatTime(entry.completionTime)}
                   </div>
-                  <div className="text-sm text-white/70 font-medium">
+                  <div className="text-xs md:text-sm text-white/70 font-medium">
                     {activeCategory === 'fastest' && `${formatScore(entry.averageScore)} avg`}
                     {activeCategory === 'highest' && `${entry.doorsCompleted} doors`}
                     {activeCategory === 'most' && `${formatScore(entry.averageScore)} avg`}
-                    {activeCategory === 'recent' && new Date(entry.completedAt).toLocaleDateString()}
+                    {activeCategory === 'recent' && (
+                      <span className="sm:hidden">{new Date(entry.completedAt).toLocaleDateString()}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -373,9 +379,9 @@ export const Leaderboard = ({ className = '' }: LeaderboardProps) => {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-white/20 text-center">
-        <p className="text-white/60 text-sm">
+      {/* Footer - Mobile Responsive */}
+      <div className="p-2 md:p-4 border-t border-white/20 text-center">
+        <p className="text-white/60 text-xs md:text-sm">
           {stats && `Last updated: ${new Date(stats.lastUpdated).toLocaleString()}`}
         </p>
       </div>

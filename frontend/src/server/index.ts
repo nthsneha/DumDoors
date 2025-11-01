@@ -1,10 +1,14 @@
 import express from 'express';
 import { InitResponse, IncrementResponse, DecrementResponse } from '../shared/types/api';
 import { redis, reddit, createServer, context, getServerPort, settings } from '@devvit/web/server';
-import { createPost } from './core/post';
+import { createPost, createMultiplayerAnnouncementPost, createTournamentPost } from './core/post';
 // import { createSplashScreen } from './core/splash';
 import { leaderboardService } from './services/leaderboardService';
 import { redditIntegrationService } from './services/redditIntegrationService';
+import { multiplayerService } from './services/multiplayerService';
+import type { 
+  CreateRoomRequest
+} from '../shared/types/multiplayer';
 
 // Backend URL - Using Cloudflare Tunnel with custom domain
 const BACKEND_URL = 'https://api.dumdoors.tech';
@@ -698,7 +702,7 @@ router.post('/internal/on-app-install', async (_req, res): Promise<void> => {
 
     res.json({
       status: 'success',
-      message: `Post created in subreddit ${context.subredditName} with id ${post.id}`,
+      message: `DumDoors 2.0 post created in subreddit ${context.subredditName} with id ${post.id}`,
     });
   } catch (error) {
     console.error(`Error creating post: ${error}`);
@@ -721,6 +725,40 @@ router.post('/internal/menu/post-create', async (_req, res): Promise<void> => {
     res.status(400).json({
       status: 'error',
       message: 'Failed to create post',
+    });
+  }
+});
+
+// Special post creation endpoints
+router.post('/internal/menu/create-multiplayer-announcement', async (_req, res): Promise<void> => {
+  try {
+    const post = await createMultiplayerAnnouncementPost();
+
+    res.json({
+      navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`,
+    });
+  } catch (error) {
+    console.error(`Error creating multiplayer announcement: ${error}`);
+    res.status(400).json({
+      status: 'error',
+      message: 'Failed to create multiplayer announcement post',
+    });
+  }
+});
+
+router.post('/internal/menu/create-tournament', async (req, res): Promise<void> => {
+  try {
+    const { tournamentName = 'Bad Decision Championship', description = 'Compete to see who can make the most entertainingly terrible choices!' } = req.body;
+    const post = await createTournamentPost(tournamentName, description);
+
+    res.json({
+      navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`,
+    });
+  } catch (error) {
+    console.error(`Error creating tournament post: ${error}`);
+    res.status(400).json({
+      status: 'error',
+      message: 'Failed to create tournament post',
     });
   }
 });
@@ -1161,6 +1199,179 @@ router.post('/api/errors', async (req, res): Promise<void> => {
   }
 });
 
+// Multiplayer API endpoints
+router.get('/api/multiplayer/rooms', async (req, res): Promise<void> => {
+  try {
+    const rooms = await multiplayerService.getRoomList();
+    res.json({ status: 'success', rooms });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to get room list:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get room list' });
+  }
+});
+
+router.post('/api/multiplayer/rooms', async (req, res): Promise<void> => {
+  try {
+    const request: CreateRoomRequest = req.body;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    // Validate request
+    if (!request.name || request.name.length > 50) {
+      res.status(400).json({ status: 'error', message: 'Invalid room name' });
+      return;
+    }
+
+    if (request.maxPlayers < 1 || request.maxPlayers > 4) {
+      res.status(400).json({ status: 'error', message: 'Invalid max players' });
+      return;
+    }
+
+    const { room, playerId } = await multiplayerService.createRoom(request, username);
+    res.json({ status: 'success', room, playerId });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to create room:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to create room' });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/join', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const { password } = req.body;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    const { room, playerId } = await multiplayerService.joinRoom(roomId, username, password);
+    res.json({ status: 'success', room, playerId });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to join room:', error);
+    const message = error instanceof Error ? error.message : 'Failed to join room';
+    res.status(400).json({ status: 'error', message });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/leave', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    await multiplayerService.leaveRoom(roomId, username);
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to leave room:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to leave room' });
+  }
+});
+
+router.get('/api/multiplayer/rooms/:roomId', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const room = await multiplayerService.getRoom(roomId);
+
+    if (!room) {
+      res.status(404).json({ status: 'error', message: 'Room not found' });
+      return;
+    }
+
+    res.json({ status: 'success', room });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to get room:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get room' });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/ready', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const { isReady } = req.body;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    const room = await multiplayerService.setPlayerReady(roomId, username, isReady);
+    if (!room) {
+      res.status(404).json({ status: 'error', message: 'Room or player not found' });
+      return;
+    }
+
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to set ready state:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to set ready state' });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/start', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    const room = await multiplayerService.startGame(roomId, username);
+    if (!room) {
+      res.status(404).json({ status: 'error', message: 'Room not found' });
+      return;
+    }
+
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to start game:', error);
+    const message = error instanceof Error ? error.message : 'Failed to start game';
+    res.status(400).json({ status: 'error', message });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/response', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const { response } = req.body;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    const room = await multiplayerService.submitResponse(roomId, username, response);
+    if (!room) {
+      res.status(400).json({ status: 'error', message: 'Invalid room or game state' });
+      return;
+    }
+
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to submit response:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to submit response' });
+  }
+});
+
+router.post('/api/multiplayer/rooms/:roomId/chat', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const { message } = req.body;
+    const username = await reddit.getCurrentUsername() || 'Anonymous';
+
+    if (!message || message.length > 200) {
+      res.status(400).json({ status: 'error', message: 'Invalid message' });
+      return;
+    }
+
+    const success = await multiplayerService.sendChatMessage(roomId, username, message);
+    if (!success) {
+      res.status(400).json({ status: 'error', message: 'Failed to send message' });
+      return;
+    }
+
+    res.json({ status: 'success' });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to send chat message:', error);
+    const message = error instanceof Error ? error.message : 'Failed to send message';
+    res.status(400).json({ status: 'error', message });
+  }
+});
+
+router.get('/api/multiplayer/rooms/:roomId/chat', async (req, res): Promise<void> => {
+  try {
+    const { roomId } = req.params;
+    const messages = await multiplayerService.getChatMessages(roomId);
+    res.json({ status: 'success', messages });
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Failed to get chat messages:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get chat messages' });
+  }
+});
+
 // Use router middleware
 app.use(router);
 
@@ -1168,5 +1379,17 @@ app.use(router);
 const port = getServerPort();
 
 const server = createServer(app);
+
+// Cleanup old rooms every 5 minutes
+setInterval(async () => {
+  try {
+    await multiplayerService.cleanupOldRooms();
+  } catch (error) {
+    console.error('🎮 [MULTIPLAYER] Cleanup error:', error);
+  }
+}, 5 * 60 * 1000);
+
 server.on('error', (err) => console.error(`server error; ${err.stack}`));
 server.listen(port);
+
+console.log('🎮 [MULTIPLAYER] Server started with polling-based multiplayer on port', port);

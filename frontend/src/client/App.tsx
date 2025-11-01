@@ -32,7 +32,7 @@ const WaitingScreen = ({ onBack }: { onBack: () => void }) => {
               console.log('Waiting video loaded successfully');
             }}
           >
-            <source src="/waitingv2.mp4" type="video/mp4" />
+            <source src={`/halloweendoru.mp4?v=${Date.now()}`} type="video/mp4" />
           </video>
         ) : (
           // Fallback content when video fails
@@ -72,6 +72,7 @@ import { scoringService, type ScoreResponse } from './services/scoringService';
 import { geminiService, type ScenarioAnalysis } from './services/geminiService';
 import { dumStonesService } from './services/dumStonesService';
 import { DumStoneReportCard } from './components/DumStoneReportCard';
+
 
 import { CONFIG } from './constants/config';
 import type { GameResults as GameResultsType } from '../shared/types/api';
@@ -142,6 +143,8 @@ export const App = () => {
   const [gamesPlayed, setGamesPlayed] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+  const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+
 
   // Load game statistics from server
   const loadGameStats = async () => {
@@ -191,13 +194,13 @@ export const App = () => {
   const updateLocalStats = (newBestScore?: number) => {
     const newCount = gamesPlayed + 1;
     setGamesPlayed(newCount);
-    
+
     if (newBestScore !== undefined) {
       const currentBest = bestScore || 0;
       const updatedBest = Math.max(currentBest, newBestScore);
       setBestScore(updatedBest);
     }
-    
+
     // Also save to localStorage as backup
     try {
       localStorage.setItem('dumdoors_games_played', newCount.toString());
@@ -231,8 +234,8 @@ export const App = () => {
       const timer = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
-            // Time's up! Auto-submit empty response
-            handleSubmitResponse('');
+            // Time's up! Show game over
+            handleTimeUp();
             return 0;
           }
           return prev - 1;
@@ -318,9 +321,43 @@ export const App = () => {
     setTotalGameTime(0);
   };
 
+  const handleTimeUp = () => {
+    // Time's up! Show game over modal
+    setShowTimeUpModal(true);
+  };
+
+  const handleGameOver = () => {
+    // Reset all game state and go back to menu
+    setShowTimeUpModal(false);
+    setGameState('menu');
+    setCurrentScenario(null);
+    setGamePath({
+      totalLength: 10,
+      nodes: [
+        { id: 'start', position: 0, type: 'start', status: 'completed' },
+      ],
+      currentPosition: 0,
+    });
+    setDoorColor('neutral');
+    setIsSubmitting(false);
+    setGameStartTime(null);
+    setTotalGameTime(0);
+    setScenarioStartTime(null);
+    setGameResults(null);
+    setCurrentAnalysis(null);
+    setPlayerScores([]);
+    setShowOutcome(false);
+    setWaitingForNext(false);
+    setShowDoorAnimation(false);
+    setGameCompleted(false);
+    setTimeLeft(CONFIG.GAME.DEFAULT_TIME_LIMIT);
+  };
+
   const handleViewLeaderboard = () => {
     setGameState('leaderboard');
   };
+
+
 
   const handleViewDumStones = async () => {
     console.log('🃏 [DEBUG] handleViewDumStones called');
@@ -668,7 +705,7 @@ export const App = () => {
 
           // Update hasPlayedBefore state since user just completed a game
           setHasPlayedBefore(true);
-          
+
           // Refresh user stats from server to get updated totals
           setTimeout(() => loadGameStats(), 1000);
 
@@ -783,31 +820,31 @@ export const App = () => {
 
           {/* TOP LEFT CORNER - Game Title & Version - Mobile Responsive */}
           <div className="absolute top-2 left-2 md:top-4 md:left-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
+            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-3 border border-white/20">
               <div className="text-white text-center">
-                <h3 className="text-sm md:text-lg font-bold mb-1">DumDoors</h3>
-                <p className="text-xs md:text-sm text-blue-200">v1.0.0</p>
+                <h3 className="text-xs md:text-lg font-bold mb-0 md:mb-1">🎃 DumDoors: Halloween Edition 🎃</h3>
+                <p className="text-xs md:text-sm text-blue-200 hidden md:block">v1.0.0</p>
               </div>
             </div>
           </div>
 
           {/* TOP RIGHT CORNER - Control Buttons - Mobile Responsive */}
           <div className="absolute top-2 right-2 md:top-4 md:right-4 z-10">
-            <div className="flex gap-1 md:gap-3">
+            <div className="flex gap-1 md:gap-2">
               {/* Volume Control */}
               <button
                 onClick={toggleMute}
-                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${isMuted ? 'ring-2 ring-red-500' : ''
+                className={`bg-black/40 backdrop-blur-lg rounded-lg p-2 md:p-3 border border-white/20 hover:bg-black/50 transition-all ${isMuted ? 'ring-2 ring-red-500' : ''
                   }`}
                 title={isMuted ? 'Unmute Music' : 'Mute Music'}
               >
-                <div className="text-white text-sm md:text-xl">{isMuted ? '🔇' : '🔊'}</div>
+                <div className="text-white text-base md:text-xl">{isMuted ? '🔇' : '🔊'}</div>
               </button>
 
               {/* Sound Effects Control */}
               <button
                 onClick={toggleSoundEffects}
-                className={`bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20 hover:bg-black/50 transition-all ${isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' :
+                className={`bg-black/40 backdrop-blur-lg rounded-lg p-2 md:p-3 border border-white/20 hover:bg-black/50 transition-all ${isSoundEnabled && soundsLoaded ? 'ring-2 ring-blue-500' :
                   isSoundEnabled && !soundsLoaded ? 'ring-2 ring-yellow-500' :
                     'ring-2 ring-gray-500'
                   }`}
@@ -816,7 +853,7 @@ export const App = () => {
                     isSoundEnabled ? 'Disable Sound Effects' : 'Enable Sound Effects'
                 }
               >
-                <div className="text-white text-sm md:text-xl">
+                <div className="text-white text-base md:text-xl">
                   {!soundsLoaded ? '⚠️' : isSoundEnabled ? '🔔' : '🔕'}
                 </div>
               </button>
@@ -824,47 +861,56 @@ export const App = () => {
               {/* Settings - Disabled */}
               <button
                 disabled
-                className="bg-black/20 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/10 opacity-50 cursor-not-allowed"
+                className="bg-black/20 backdrop-blur-lg rounded-lg p-2 md:p-3 border border-white/10 opacity-50 cursor-not-allowed"
                 title="Settings (Coming Soon)"
               >
-                <div className="text-white/60 text-sm md:text-xl">⚙️</div>
+                <div className="text-white/60 text-base md:text-xl">⚙️</div>
               </button>
             </div>
           </div>
 
-          {/* BOTTOM LEFT CORNER - Profile Section - Mobile Responsive */}
-          <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
-              <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm md:text-xl">
-                    {username ? username.charAt(0).toUpperCase() : 'R'}
-                  </span>
-                </div>
-                <div className="text-white">
-                  <p className="font-semibold text-xs md:text-base">u/{username || 'anonymous'}</p>
-                  <p className="text-xs md:text-sm text-orange-200">Reddit User</p>
-                </div>
+          {/* Floating Multi-Player Notice - Above Stats Bar */}
+          <div className="absolute bottom-20 md:bottom-24 left-1/2 transform -translate-x-1/2 z-20 w-[500px] max-w-[90vw] overflow-hidden bg-gradient-to-r from-orange-600/80 via-orange-500/80 to-amber-600/80 backdrop-blur-sm border border-white/20 rounded-lg shadow-lg">
+            <div className="relative h-8 md:h-10 flex items-center">
+              <div className="animate-marquee whitespace-nowrap text-white font-bold text-sm md:text-base tracking-wide">
+                🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮
               </div>
             </div>
           </div>
 
-          {/* BOTTOM RIGHT CORNER - Game Stats - Mobile Responsive */}
-          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 z-10">
-            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-4 border border-white/20">
-              <div className="text-white text-right">
-                <div className="text-xs md:text-sm text-blue-200 mb-1">🎮 Games: {gamesPlayed}</div>
-                <div className="text-xs md:text-sm text-blue-200 mb-1">🏆 Best: {bestScore ? bestScore : '--'}</div>
-                <div className="flex items-center gap-1 md:gap-2 justify-end">
-                  <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs md:text-sm">Online</span>
+          {/* BOTTOM STATS BAR - Mobile Responsive */}
+          <div className="absolute bottom-2 left-2 right-2 md:left-4 md:right-4 z-10">
+            <div className="bg-black/40 backdrop-blur-lg rounded-lg md:rounded-xl p-2 md:p-3 border border-white/20">
+              <div className="flex items-center justify-between text-white">
+                {/* Profile Section */}
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-xs md:text-sm">
+                      {username ? username.charAt(0).toUpperCase() : 'R'}
+                    </span>
+                  </div>
+                  <div className="text-white">
+                    <p className="font-semibold text-xs md:text-sm">u/{username || 'anonymous'}</p>
+                  </div>
+                </div>
+
+                {/* Game Stats */}
+                <div className="text-right">
+                  <div className="flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+                    <span className="text-blue-200">🎮 {gamesPlayed}</span>
+                    <span className="text-blue-200">🏆 {bestScore ? bestScore : '--'}</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-green-200">Online</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* BOTTOM CENTER - Tagline and Menu Buttons - Mobile Responsive */}
-          <div className="absolute bottom-16 md:bottom-20 left-1/2 transform -translate-x-1/2 z-10 px-4 w-full max-w-sm md:max-w-md">
+          <div className="absolute bottom-44 md:bottom-48 left-1/2 transform -translate-x-1/2 z-10 px-4 w-full max-w-sm md:max-w-md">
             <div className="flex flex-col items-center gap-4 md:gap-6">
               {/* Tagline */}
               <div className="text-center mb-2">
@@ -880,14 +926,16 @@ export const App = () => {
                   className="bg-gradient-to-r from-amber-500/90 via-orange-500/90 to-red-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-amber-600/90 hover:via-orange-600/90 hover:to-red-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-amber-400/40 hover:border-amber-300/60 hover:shadow-amber-500/25"
                 >
                   <div className="flex items-center justify-center gap-2 md:gap-3">
-                    <span className="text-xl md:text-2xl">🎮</span>
-                    <span>Start New Game</span>
+                    <span className="text-xl md:text-2xl">🎃</span>
+                    <span>Start Halloween Adventure</span>
                   </div>
                 </button>
 
+
+
                 <button
                   onClick={handleViewLeaderboard}
-                  className="bg-gradient-to-r from-purple-600/90 via-blue-600/90 to-cyan-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-purple-700/90 hover:via-blue-700/90 hover:to-cyan-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-purple-400/40 hover:border-purple-300/60 hover:shadow-purple-500/25"
+                  className="bg-gradient-to-r from-green-600/90 via-emerald-600/90 to-teal-500/90 backdrop-blur-sm text-white px-8 py-3 md:px-12 md:py-4 rounded-xl font-bold text-base md:text-lg hover:from-green-700/90 hover:via-emerald-700/90 hover:to-teal-600/90 transform hover:scale-105 transition-all duration-200 shadow-2xl border-2 border-green-400/40 hover:border-green-300/60 hover:shadow-green-500/25"
                 >
                   <div className="flex items-center justify-center gap-2 md:gap-3">
                     <span className="text-xl md:text-2xl">🏆</span>
@@ -920,14 +968,7 @@ export const App = () => {
           </div>
         </div>
 
-        {/* Floating Multi-Player Notice - Central Bottom */}
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-[500px] max-w-[90vw] overflow-hidden border border-white/10 rounded-lg">
-          <div className="relative h-10 flex items-center">
-            <div className="animate-marquee whitespace-nowrap text-white font-bold text-base tracking-wide drop-shadow-lg">
-              🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮 Multi-Player coming soon! 🎮 Get ready for epic battles! 🎮
-            </div>
-          </div>
-        </div>
+
       </ErrorBoundary>
     );
   }
@@ -1377,6 +1418,25 @@ export const App = () => {
             </div>
           </div>
         </div>
+
+        {/* Time Up Modal */}
+        {showTimeUpModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-red-900 via-red-800 to-red-900 rounded-2xl p-8 max-w-md w-full text-center border-4 border-red-500/50 shadow-2xl shadow-red-500/30">
+              <div className="text-8xl mb-6 animate-bounce">⏰</div>
+              <h2 className="text-4xl font-bold text-white mb-4">Time's Up!</h2>
+              <p className="text-red-200 text-lg mb-8">
+                You ran out of time to make your decision. Better luck next time!
+              </p>
+              <button
+                onClick={handleGameOver}
+                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-4 rounded-xl font-bold text-lg transform hover:scale-105 transition-all duration-200 shadow-lg border-2 border-red-400/40 hover:border-red-300/60"
+              >
+                🏠 Back to Menu
+              </button>
+            </div>
+          </div>
+        )}
       </ErrorBoundary>
     );
   }
@@ -1386,28 +1446,28 @@ export const App = () => {
     return (
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950">
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            {/* Header */}
-            <div className="text-center mb-8">
+          <div className="max-w-4xl mx-auto px-2 md:px-4 py-4 md:py-8">
+            {/* Header - Mobile Responsive */}
+            <div className="text-center mb-4 md:mb-8 relative">
               <button
                 onClick={handleBackToMenu}
-                className="absolute top-4 left-4 bg-white/10 backdrop-blur-lg text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+                className="absolute top-0 left-0 md:top-4 md:left-4 bg-white/10 backdrop-blur-lg text-white px-2 md:px-4 py-1 md:py-2 rounded-lg hover:bg-white/20 transition-colors text-sm md:text-base"
               >
-                ← Back to Menu
+                ← Back
               </button>
 
               <img
                 src="/logo.png"
                 alt="DumDoors Logo"
-                className="w-24 h-24 mx-auto mb-4 object-contain"
+                className="w-16 h-16 md:w-24 md:h-24 mx-auto mb-2 md:mb-4 object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-1 md:mb-2 px-4">
                 🏆 Global Leaderboard
               </h1>
-              <p className="text-blue-200">See how you stack up against other players</p>
+              <p className="text-blue-200 text-sm md:text-base px-4">See how you stack up against other players</p>
             </div>
 
             {/* Leaderboard Component */}
@@ -1464,50 +1524,52 @@ export const App = () => {
 
 
 
+
+
   // DumStones Page
   if (gameState === 'dumstones') {
     console.log('🃏 [DEBUG] Rendering DumStones page, dumStoneReport:', dumStoneReport);
     return (
       <ErrorBoundary>
         <div className="min-h-screen" style={{ backgroundColor: '#000f3e' }}>
-          <div className="max-w-4xl mx-auto px-4 py-8">
-            {/* Header */}
-            <div className="text-center mb-8">
+          <div className="max-w-4xl mx-auto px-2 md:px-4 py-4 md:py-8">
+            {/* Header - Mobile Responsive */}
+            <div className="text-center mb-4 md:mb-8 relative">
               <button
                 onClick={handleCloseDumStones}
-                className="absolute top-4 left-4 bg-white/10 backdrop-blur-lg text-white px-4 py-2 rounded-lg hover:bg-white/20 transition-colors"
+                className="absolute top-0 left-0 md:top-4 md:left-4 bg-white/10 backdrop-blur-lg text-white px-2 md:px-4 py-1 md:py-2 rounded-lg hover:bg-white/20 transition-colors text-sm md:text-base"
               >
-                ← Back to Menu
+                ← Back
               </button>
 
               <img
                 src="/logo.png"
                 alt="DumDoors Logo"
-                className="w-24 h-24 mx-auto mb-4 object-contain"
+                className="w-16 h-16 md:w-24 md:h-24 mx-auto mb-2 md:mb-4 object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-1 md:mb-2 px-4">
                 🪦 Your DumStone
               </h1>
-              <p className="text-blue-200">AI-powered personality analysis based on your game decisions</p>
+              <p className="text-blue-200 text-sm md:text-base px-4">AI-powered personality analysis based on your game decisions</p>
             </div>
 
-            {/* Content */}
+            {/* Content - Mobile Responsive */}
             <div className="flex justify-center">
               {dumStoneReport === 'generating' && (
                 <WaitingScreen onBack={handleCloseDumStones} />
               )}
 
               {dumStoneReport === 'error' && (
-                <div className="bg-white rounded-2xl p-8 text-center max-w-md">
-                  <div className="text-6xl mb-4">😵</div>
-                  <div className="text-xl font-bold mb-2 text-gray-800">Oops! Something went wrong</div>
-                  <div className="text-gray-600 mb-6">Our AI got too excited analyzing you and crashed.</div>
+                <div className="bg-white rounded-2xl p-4 md:p-8 text-center max-w-sm md:max-w-md mx-2">
+                  <div className="text-4xl md:text-6xl mb-2 md:mb-4">😵</div>
+                  <div className="text-lg md:text-xl font-bold mb-1 md:mb-2 text-gray-800">Oops! Something went wrong</div>
+                  <div className="text-gray-600 mb-4 md:mb-6 text-sm md:text-base">Our AI got too excited analyzing you and crashed.</div>
                   <button
                     onClick={handleViewDumStones}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base"
                   >
                     Try Again
                   </button>
